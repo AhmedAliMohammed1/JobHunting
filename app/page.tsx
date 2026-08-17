@@ -24,7 +24,6 @@ import {
   UserRound,
   WandSparkles,
 } from "lucide-react";
-import { SaveJobButton } from "@/src/components/jobs/save-job-button";
 
 const navigation = [
   { label: "Overview", icon: LayoutDashboard, active: true, href: "/dashboard" },
@@ -261,7 +260,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="job-actions">
-                      <SaveJobButton title={job.title} />
+                    <Link className="save-button" aria-label={`Sign in to save ${job.title}`} href="/login"><Bookmark size={17} /></Link>
                       <Link className="apply-button" href={`/jobs/${job.id}`}>Review role</Link>
                     </div>
                   </article>

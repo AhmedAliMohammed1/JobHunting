@@ -8,7 +8,9 @@ const protectedPrefixes = [
   "/saved",
   "/applications",
   "/automation",
+  "/cv",
   "/profile",
+  "/search-profiles",
   "/notifications",
   "/settings",
 ];
@@ -16,7 +18,16 @@ const protectedPrefixes = [
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) return NextResponse.next({ request });
+  const needsAuth = protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
+  if (!url || !key) {
+    if (needsAuth && process.env.NODE_ENV === "production") {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("error", "configuration");
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next({ request });
+  }
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
@@ -31,7 +42,6 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getClaims();
-  const needsAuth = protectedPrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
   if (needsAuth && !data?.claims?.sub) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
@@ -44,4 +54,3 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
-

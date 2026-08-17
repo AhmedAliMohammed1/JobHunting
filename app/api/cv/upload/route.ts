@@ -22,9 +22,18 @@ export async function POST(request: Request) {
   if (!hasValidSignature(file.type, bytes)) return NextResponse.json({ error: "The file contents do not match the declared format." }, { status: 400 });
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Storage is not configured." }, { status: 503 });
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const sha256 = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+  const { data: duplicate } = await supabase.from("cv_documents").select("id").eq("user_id", user.id).eq("sha256", sha256).is("deleted_at", null).maybeSingle();
+  if (duplicate) return NextResponse.json({ error: "This CV version has already been uploaded." }, { status: 409 });
   const extension = file.type === PDF ? "pdf" : "docx";
   const key = `${user.id}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("cvs").upload(key, bytes, { contentType: file.type, upsert: false });
   if (error) return NextResponse.json({ error: "Private storage rejected the upload." }, { status: 500 });
-  return NextResponse.json({ key, status: "uploaded" }, { status: 201 });
+  const { data: document, error: metadataError } = await supabase.from("cv_documents").insert({ user_id: user.id, storage_path: key, original_filename: file.name.slice(0, 500), mime_type: file.type, size_bytes: file.size, sha256, parse_status: "PENDING" }).select("id,original_filename,parse_status,created_at").single();
+  if (metadataError || !document) {
+    await supabase.storage.from("cvs").remove([key]);
+    return NextResponse.json({ error: "The CV was not recorded; the uploaded file was rolled back." }, { status: 500 });
+  }
+  return NextResponse.json({ document, status: "uploaded" }, { status: 201 });
 }

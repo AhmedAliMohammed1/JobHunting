@@ -1,2 +1,3 @@
-import { EmptyCard, SectionShell } from "@/src/components/dashboard/section-shell";
-export default function Page(){return <SectionShell eyebrow="Saved searches" title="Turn intent into a repeatable search." description="Profiles combine roles, locations, exclusions, freshness, salary, and notification cadence."><EmptyCard title="Europe · Applied AI"><div className="tag-row"><span>Applied AI</span><span>Remote or hybrid</span><span>Posted ≤ 7 days</span><span>Exclude agencies</span></div><p>Schedule is disabled until an email channel is verified.</p></EmptyCard></SectionShell>}
+import { SectionShell } from "@/src/components/dashboard/section-shell";
+import { SavedSearchesManager } from "@/src/components/searches/saved-searches-manager";
+export default function Page(){return <SectionShell eyebrow="Saved searches" title="Turn intent into a repeatable search." description="Profiles combine roles, locations, freshness, match thresholds, and notification cadence."><SavedSearchesManager /></SectionShell>}

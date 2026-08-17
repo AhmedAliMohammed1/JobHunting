@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Command, LoaderCircle } from "lucide-react";
 import { createClient } from "@/src/lib/database/supabase/client";
+import { safeReturnPath } from "@/src/lib/auth/paths";
+import { passwordUpdateSchema, registrationSchema, resetRequestSchema, signInSchema } from "@/src/lib/validation/auth";
 
 type Mode = "login" | "register" | "forgot" | "reset";
 
@@ -22,6 +24,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const configurationMissing = !createClient();
+  const queryError = searchParams.get("error");
+  const initialError = queryError === "confirmation_failed" ? "The confirmation link is invalid or expired. Request a new one." : queryError === "configuration" ? "Authentication is not configured for this deployment." : undefined;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,6 +37,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
     const password = String(form.get("password") ?? "");
     const supabase = createClient();
 
+    const credentials = mode === "login" ? signInSchema.safeParse({ email, password }) : mode === "register" ? registrationSchema.safeParse({ email, password }) : mode === "forgot" ? resetRequestSchema.safeParse({ email }) : passwordUpdateSchema.safeParse({ password });
+    if (!credentials.success) {
+      setError(credentials.error.issues[0]?.message ?? "Check the form fields.");
+      setPending(false);
+      return;
+    }
+
     if (!supabase) {
       setError("Authentication is not configured in this environment.");
       setPending(false);
@@ -43,8 +54,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       if (mode === "login") {
         const result = await supabase.auth.signInWithPassword({ email, password });
         if (result.error) throw result.error;
-        const returnTo = searchParams.get("returnTo");
-        router.replace(returnTo?.startsWith("/") ? returnTo : "/dashboard");
+        router.replace(safeReturnPath(searchParams.get("returnTo")));
         router.refresh();
       } else if (mode === "register") {
         const result = await supabase.auth.signUp({
@@ -61,7 +71,6 @@ export function AuthForm({ mode }: { mode: Mode }) {
         if (result.error) throw result.error;
         setMessage("If an account exists for that address, a reset link is on its way.");
       } else {
-        if (password.length < 12) throw new Error("Use at least 12 characters.");
         const result = await supabase.auth.updateUser({ password });
         if (result.error) throw result.error;
         router.replace("/dashboard");
@@ -123,7 +132,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <div className="auth-notice">Development preview: connect Supabase to enable sign-in.</div>
           ) : null}
           {message ? <div className="auth-success" role="status">{message}</div> : null}
-          {error ? <div className="auth-error" role="alert">{error}</div> : null}
+          {error || initialError ? <div className="auth-error" role="alert">{error ?? initialError}</div> : null}
 
           {mode === "login" || mode === "register" ? (
             <>
@@ -144,7 +153,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             {mode !== "forgot" ? (
               <label>
                 {mode === "reset" ? "New password" : "Password"}
-                <input name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "reset" ? 12 : 8} required />
+                <input name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? 8 : 12} required />
               </label>
             ) : null}
             {mode === "login" ? <Link className="forgot-link" href="/forgot-password">Forgot password?</Link> : null}
@@ -164,4 +173,3 @@ export function AuthForm({ mode }: { mode: Mode }) {
     </main>
   );
 }
-

@@ -13,7 +13,7 @@ JobHunter AI is a privacy-first job discovery, matching, and application-prepara
 - AI abstraction for OpenAI-compatible structured output and embeddings, plus explicit mock/not-configured modes
 - Application state machine, sensitive-answer review, dry-run gate, limits, allowlists, and idempotency-ready schema
 - Separate Playwright worker foundation and Manifest V3 review extension
-- Unit tests, browser smoke tests, GitHub Actions, Vercel config, and operational documentation
+- Unit, provider-contract, API-integration, desktop/mobile browser suites, GitHub Actions, Vercel config, and operational documentation
 
 ## Local setup
 
@@ -41,6 +41,8 @@ To configure Supabase:
 npm run lint
 npm run typecheck
 npm test
+npm run test:integration
+npm run test:coverage
 npm run test:e2e
 npm run build
 ```

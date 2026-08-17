@@ -25,4 +25,4 @@ export const jobSearchSchema = z.object({
 export const searchRequestSchema = z.object({
   query: z.string().trim().max(500).optional(),
   filters: jobSearchSchema.partial().optional(),
-});
+}).refine((input) => Boolean(input.query || (input.filters && Object.keys(input.filters).length)), "A query or filter is required.");

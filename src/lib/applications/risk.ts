@@ -9,5 +9,5 @@ export function classifyFieldRisk(field: Pick<ApplicationField, "label" | "type"
 }
 
 export function requiresUserReview(field: ApplicationField): boolean {
-  return classifyFieldRisk(field) === "HIGH" || field.unknown === true || (field.confidence ?? 0) < 0.8;
+  return classifyFieldRisk(field) === "HIGH" || field.unknown === true || (field.confidence !== undefined && field.confidence < 0.8);
 }

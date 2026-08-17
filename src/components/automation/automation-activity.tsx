@@ -1,0 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Gauge, PauseCircle, ShieldCheck } from "lucide-react";
+type Task = { id: string; task_type: string; status: string; attempts: number; created_at: string; application?: { job?: { title?: string; company?: string } } };
+export function AutomationActivity() {
+  const [tasks, setTasks] = useState<Task[]>([]); const [message, setMessage] = useState("Loading activity…");
+  useEffect(() => { fetch("/api/automation/activity").then(async (response) => ({ response, body: await response.json() as { tasks?: Task[]; error?: string } })).then(({ response, body }) => { if (!response.ok) throw new Error(body.error ?? "Could not load activity."); setTasks(body.tasks ?? []); setMessage(""); }).catch((error: Error) => setMessage(error.message)); }, []);
+  return <div className="stacked-content"><div className="settings-grid"><article className="product-card"><div className="card-title"><PauseCircle/><div><h2>Interruptible by design</h2><p>Every queued task can stop for human input.</p></div></div></article><article className="product-card"><div className="card-title"><Gauge/><div><h2>{tasks.length} recorded tasks</h2><p>Attempts and terminal status remain auditable.</p></div></div></article><article className="product-card"><div className="card-title"><ShieldCheck/><div><h2>Hard checkpoints</h2><p>CAPTCHA, OTP, login, unknowns, and sensitive fields stop.</p></div></div></article></div>{tasks.length ? <div className="application-list">{tasks.map((task) => <article className="result-card" key={task.id}><div><span className="source-label">{task.status.toUpperCase()} · {task.task_type}</span><h2>{task.application?.job?.title ?? "Automation task"}</h2><p>{task.application?.job?.company ?? "No linked role"} · attempt {task.attempts}</p></div><time>{new Date(task.created_at).toLocaleString()}</time></article>)}</div> : <article className="product-card"><p>{message || "No automation tasks. Simulation and user preference do not submit applications by themselves."}</p></article>}</div>;
+}

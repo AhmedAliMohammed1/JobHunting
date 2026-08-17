@@ -20,11 +20,13 @@ export async function GET() {
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
+      ready: database === "ok",
       timestamp: new Date().toISOString(),
       components: {
         application: "ok",
         database,
-        queue: process.env.QUEUE_PROVIDER ? "configured" : "not_configured",
+        auth: isSupabaseConfigured() ? "configured" : "not_configured",
+        queue: process.env.SUPABASE_SECRET_KEY ? "database-backed" : "not_configured",
         worker: process.env.AUTOMATION_WORKER_URL ? "configured" : "not_configured",
       },
     },
@@ -34,4 +36,3 @@ export async function GET() {
     },
   );
 }
-

@@ -13,11 +13,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration tests/contracts",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "worker:check": "tsc -p worker/tsconfig.json",
     "format": "prettier --write .",
-    "check": "npm run lint && npm run typecheck && npm run worker:check && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run worker:check && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

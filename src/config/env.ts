@@ -15,7 +15,12 @@ const serverEnvSchema = z.object({
   AUTOMATION_WORKER_URL: z.string().url().optional(),
   AUTOMATION_WORKER_SECRET: z.string().min(24).optional(),
   ENABLE_ARBEITNOW: z.enum(["true", "false"]).default("true"),
+  ENABLE_REMOTE_OK: z.enum(["true", "false"]).default("true"),
   ENABLE_REMOTIVE: z.enum(["true", "false"]).default("false"),
+  ADZUNA_APP_ID: z.string().min(1).optional(),
+  ADZUNA_APP_KEY: z.string().min(1).optional(),
+  ADZUNA_COUNTRIES: z.string().default("de,gb,us"),
+  JOOBLE_API_KEY: z.string().min(1).optional(),
   JOB_PROVIDER_MODE: z.enum(["mock", "live"]).default("mock"),
   REMOTIVE_CACHE_TTL_SECONDS: z.coerce.number().int().min(900).default(21600),
 });

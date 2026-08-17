@@ -71,6 +71,22 @@ export interface JobProvider {
   healthCheck?(signal?: AbortSignal): Promise<ProviderHealth>;
 }
 
+export type JobProviderAvailability =
+  | "active"
+  | "needs-api-key"
+  | "needs-company-board"
+  | "partner-access"
+  | "restricted";
+
+export interface JobProviderCatalogEntry {
+  id: string;
+  name: string;
+  availability: JobProviderAvailability;
+  coverage: "global" | "remote" | "regional" | "company-specific";
+  detail: string;
+  setup?: string;
+}
+
 export interface ProviderSearchResult {
   providerId: string;
   jobs: NormalizedJob[];

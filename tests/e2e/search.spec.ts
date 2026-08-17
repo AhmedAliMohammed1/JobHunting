@@ -35,6 +35,15 @@ test.describe("job search suite", () => {
     await expect(page.getByText("Arc & Field")).toHaveCount(0);
   });
 
+  test("shows source availability instead of presenting restricted sites as active", async ({ page }) => {
+    const sourceSummary = page.getByText(/Search sources:/);
+    await expect(sourceSummary).toBeVisible();
+    await sourceSummary.click();
+    await expect(page.getByText("Remote OK", { exact: true })).toBeVisible();
+    await expect(page.getByText("LinkedIn", { exact: true })).toBeVisible();
+    await expect(page.getByText("Partner access needed").first()).toBeVisible();
+  });
+
   test("durable save actions enforce authentication", async ({ page }) => {
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.getByRole("button", { name: /Save Senior Frontend Engineer/i }).click();

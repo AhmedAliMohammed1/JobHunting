@@ -8,7 +8,11 @@ describe("public API integration", () => {
 
   it("reports missing deployment dependencies without leaking secrets", async () => {
     const response = await getConfig(); const body = await response.json();
-    expect(response.status).toBe(200); expect(body.services.auth).toBe(false); expect(JSON.stringify(body)).not.toContain("key");
+    expect(response.status).toBe(200); expect(body.services.auth).toBe(false);
+    expect(JSON.stringify(body)).not.toContain("SUPABASE_SECRET_KEY");
+    expect(body).not.toHaveProperty("environment");
+    expect(body.providerCatalog.find((provider: { id: string }) => provider.id === "remote-ok")).toMatchObject({ availability: "active" });
+    expect(body.providerCatalog.find((provider: { id: string }) => provider.id === "linkedin")).toMatchObject({ availability: "partner-access" });
   });
 
   it("returns a no-store health response", async () => {

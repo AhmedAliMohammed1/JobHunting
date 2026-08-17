@@ -56,6 +56,9 @@ export function normalizedJob(input: {
   description?: string;
   employmentType?: string;
   salaryText?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
   postedAt?: string;
   companyLogo?: string;
   skills?: string[];
@@ -79,6 +82,9 @@ export function normalizedJob(input: {
     employmentType: cleanText(input.employmentType),
     seniority: cleanText(input.seniority) ?? inferSeniority(input.title),
     salaryText: cleanText(input.salaryText),
+    salaryMin: input.salaryMin,
+    salaryMax: input.salaryMax,
+    salaryCurrency: cleanText(input.salaryCurrency),
     description,
     skills: [...new Set([...inferSkills(description), ...(input.skills ?? []).map((skill) => cleanText(skill)).filter((skill): skill is string => Boolean(skill))])],
     postedAt: input.postedAt,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { effectiveJobProviderMode, getServerEnv, isSupabaseConfigured } from "@/src/config/env";
 import { configuredJobProviders } from "@/src/lib/jobs/providers";
 import { isFeatureEnabled } from "@/src/config/features";
+import { jobProviderCatalog } from "@/src/lib/jobs/providers/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function GET() {
     services: { auth, database, ai, jobs, worker: Boolean(env.AUTOMATION_WORKER_URL) },
     modes: { ai: env.AI_PROVIDER, jobs: jobMode },
     providers: jobProviders,
+    providerCatalog: jobProviderCatalog(env),
     features: {
       autoApply: isFeatureEnabled("AUTO_APPLY"),
       browserAutomation: isFeatureEnabled("BROWSER_AUTOMATION"),

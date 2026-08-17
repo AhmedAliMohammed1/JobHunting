@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, Search, SlidersHorizontal } from "lucide-react";
-import type { JobSearchQuery, NormalizedJob, ProviderHealth, WorkplaceType } from "@/src/types/jobs";
+import type { JobProviderCatalogEntry, JobSearchQuery, NormalizedJob, ProviderHealth, WorkplaceType } from "@/src/types/jobs";
 import type { MatchResult } from "@/src/types/matching";
 import { SaveJobButton } from "./save-job-button";
 import { splitList } from "@/src/lib/validation/product";
@@ -22,8 +22,19 @@ type SearchResponse = {
 
 const PROVIDER_LABELS: Record<string, string> = {
   arbeitnow: "Arbeitnow",
+  "remote-ok": "Remote OK",
+  adzuna: "Adzuna",
+  jooble: "Jooble",
   remotive: "Remotive",
   mock: "Development fixture",
+};
+
+const AVAILABILITY_LABELS: Record<JobProviderCatalogEntry["availability"], string> = {
+  active: "Active",
+  "needs-api-key": "API key needed",
+  "needs-company-board": "Company boards needed",
+  "partner-access": "Partner access needed",
+  restricted: "Not enabled",
 };
 
 function optionalNumber(value: string): number | undefined {
@@ -50,6 +61,8 @@ export function SearchWorkspace() {
   const [query, setQuery] = useState("");
   const [jobs, setJobs] = useState<SearchJob[]>([]);
   const [providers, setProviders] = useState<ProviderHealth[]>([]);
+  const [configuredSources, setConfiguredSources] = useState<string[]>([]);
+  const [providerCatalog, setProviderCatalog] = useState<JobProviderCatalogEntry[]>([]);
   const [interpretedQuery, setInterpretedQuery] = useState<JobSearchQuery>();
   const [notice, setNotice] = useState("Search live vacancies with natural language or precise filters.");
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -67,6 +80,22 @@ export function SearchWorkspace() {
   const [minimumSalary, setMinimumSalary] = useState("");
   const [minimumMatch, setMinimumMatch] = useState("");
   const [savedSearchMessage, setSavedSearchMessage] = useState("");
+
+  useEffect(() => {
+    void fetch("/api/config/status", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load search source status.");
+        return response.json() as Promise<{ providers?: string[]; providerCatalog?: JobProviderCatalogEntry[] }>;
+      })
+      .then((status) => {
+        setConfiguredSources(status.providers ?? []);
+        setProviderCatalog(status.providerCatalog ?? []);
+      })
+      .catch(() => {
+        setConfiguredSources([]);
+        setProviderCatalog([]);
+      });
+  }, []);
 
   function filters() {
     return {
@@ -130,6 +159,8 @@ export function SearchWorkspace() {
 
   const failedProviders = providers.filter((provider) => !provider.ok).length;
   const chips = queryChips(interpretedQuery);
+  const selectableSources = providerCatalog.filter((provider) => configuredSources.includes(provider.id) && provider.id !== "mock");
+  const activeSourceCount = providerCatalog.filter((provider) => provider.availability === "active").length;
 
   return <div className="search-workspace">
     <form className="search-bar" onSubmit={(event) => { event.preventDefault(); void search(); }}>
@@ -150,10 +181,21 @@ export function SearchWorkspace() {
       <label>Experience<select value={experience} onChange={(event) => setExperience(event.target.value)}><option value="">Any</option><option value="Internship">Internship</option><option value="Junior">Junior / entry level</option><option value="Mid level">Mid level</option><option value="Senior">Senior</option><option value="Lead">Lead / staff</option></select></label>
       <label>Date posted<select value={postedWithin} onChange={(event) => setPostedWithin(event.target.value)}><option value="">Any</option><option value="24">Past day</option><option value="168">Past week</option><option value="720">Past month</option></select></label>
       <label>Company<input value={company} onChange={(event) => setCompany(event.target.value)} placeholder="Company names" /></label>
-      <label>Source<select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All configured sources</option><option value="arbeitnow">Arbeitnow</option><option value="remotive">Remotive</option></select></label>
+      <label>Source<select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All configured sources</option>{selectableSources.map((provider) => <option value={provider.id} key={provider.id}>{provider.name}</option>)}</select></label>
       <label>Minimum salary<input type="number" min="0" step="1000" value={minimumSalary} onChange={(event) => setMinimumSalary(event.target.value)} placeholder="60000" /></label>
       <label>Minimum CV match<select value={minimumMatch} onChange={(event) => setMinimumMatch(event.target.value)}><option value="">Any</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option></select></label>
     </div> : null}
+    {providerCatalog.length ? <details className="provider-catalog">
+      <summary>Search sources: {activeSourceCount} active · {providerCatalog.length - activeSourceCount} available with access or setup</summary>
+      <p>Only official APIs, public employer boards, and approved feeds are connected. Sites without compliant search access are listed honestly instead of being scraped.</p>
+      <div className="provider-catalog-grid">
+        {providerCatalog.map((provider) => <article key={provider.id}>
+          <div><strong>{provider.name}</strong><span className={`provider-state provider-state-${provider.availability}`}>{AVAILABILITY_LABELS[provider.availability]}</span></div>
+          <p>{provider.detail}</p>
+          {provider.setup ? <small>{provider.setup}</small> : null}
+        </article>)}
+      </div>
+    </details> : null}
     {chips.length ? <div className="interpreted-query" aria-label="Interpreted search filters"><strong>Understood as</strong>{chips.map((chip) => <span key={chip}>{chip}</span>)}</div> : null}
     {providers.length ? <p className="provider-summary">{providers.length} source{providers.length === 1 ? "" : "s"} searched · {providers.reduce((total, provider) => total + (provider.jobsReturned ?? 0), 0)} matching rows before deduplication{failedProviders ? ` · ${failedProviders} unavailable` : ""}</p> : null}
     {warnings.map((warning) => <p className="search-warning" key={warning}><AlertTriangle size={15} />{warning}</p>)}

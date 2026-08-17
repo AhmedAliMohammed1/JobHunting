@@ -17,18 +17,26 @@ export function jobProviderCatalog(env: ServerEnv): JobProviderCatalogEntry[] {
     setup: discoveryReady ? undefined : "Optional: add TAVILY_API_KEY in Vercel.",
   });
 
-  const atsEntry = (id: string, name: string): JobProviderCatalogEntry => ({
-    id,
-    name,
-    availability: discoveryReady || configuredAts.has(id) ? "ats-discovery" : "optional",
-    coverage: "company-specific",
-    detail: configuredAts.has(id)
-      ? "Configured employer ATS boards are queried directly; public search discovery is used as a fallback."
-      : discoveryReady
-        ? "ATS public-job discovery enabled; configured employer boards can also be queried directly."
-        : "Employer boards are optional; public ATS discovery becomes available with the search provider.",
-    setup: discoveryReady || configuredAts.has(id) ? undefined : "Optional: add TAVILY_API_KEY or configure JOB_CAREER_SOURCES_JSON.",
-  });
+  const atsEntry = (id: string, name: string, directRegistrySupported = true): JobProviderCatalogEntry => {
+    const directReady = directRegistrySupported && configuredAts.has(id);
+    const available = discoveryReady || directReady;
+    return {
+      id,
+      name,
+      availability: available ? "ats-discovery" : "optional",
+      coverage: "company-specific",
+      detail: directReady
+        ? "Configured employer ATS boards are queried directly; public search discovery is used as a fallback when configured."
+        : discoveryReady
+          ? directRegistrySupported
+            ? "ATS public-job discovery enabled; configured employer boards can also be queried directly."
+            : "Publicly indexed employer postings are discovered through the configured search provider."
+          : directRegistrySupported
+            ? "Employer boards are optional; public ATS discovery becomes available with the search provider."
+            : "This ATS requires public search discovery because tenant-specific endpoints are not treated as a global API.",
+      setup: available ? undefined : directRegistrySupported ? "Optional: add TAVILY_API_KEY or configure JOB_CAREER_SOURCES_JSON." : "Optional: add TAVILY_API_KEY in Vercel.",
+    };
+  };
 
   return [
     {
@@ -56,8 +64,8 @@ export function jobProviderCatalog(env: ServerEnv): JobProviderCatalogEntry[] {
     atsEntry("ashby", "Ashby"),
     atsEntry("smartrecruiters", "SmartRecruiters"),
     atsEntry("personio", "Personio"),
-    atsEntry("workday", "Workday"),
-    atsEntry("sap-successfactors", "SAP SuccessFactors"),
+    atsEntry("workday", "Workday", false),
+    atsEntry("sap-successfactors", "SAP SuccessFactors", false),
     discoveryEntry("linkedin", "LinkedIn"),
     discoveryEntry("indeed", "Indeed"),
     discoveryEntry("stepstone", "StepStone", "regional"),

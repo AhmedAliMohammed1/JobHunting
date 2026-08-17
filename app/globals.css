@@ -223,6 +223,7 @@ a:focus-visible {
   margin-top: 13px;
   padding: 12px 7px 2px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+  text-decoration: none;
 }
 
 .avatar {
@@ -349,6 +350,24 @@ a:focus-visible {
   margin: 0 auto;
   padding: 38px 34px 30px;
 }
+
+.auth-state-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 14px 17px;
+  color: #37544a;
+  background: #f0f8df;
+  border: 1px solid #cfe6a4;
+  border-radius: 11px;
+}
+
+.auth-state-banner > svg { color: #648d29; }
+.auth-state-banner p { margin: 0; font-size: 12px; line-height: 1.5; }
+.auth-state-banner strong { color: #173c2c; }
+.auth-state-banner a { display: inline-flex; align-items: center; gap: 4px; color: #466d20; font-size: 11px; font-weight: 750; text-decoration: none; white-space: nowrap; }
 
 .welcome-row {
   display: flex;
@@ -947,6 +966,8 @@ h1 {
   .pause-button { padding: 0 10px; }
   .pause-button svg { display: none; }
   .content-wrap { padding: 27px 18px; }
+  .auth-state-banner { grid-template-columns: auto 1fr; }
+  .auth-state-banner a { grid-column: 2; }
   .welcome-row { align-items: flex-start; }
   .primary-button { min-width: 44px; padding: 0; }
   .primary-button svg { margin: 0; }

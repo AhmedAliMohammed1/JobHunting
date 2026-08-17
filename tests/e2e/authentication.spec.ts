@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("authentication suite", () => {
+  test("public home is clearly signed out and routes workspace actions through login", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/you are viewing a public product tour/i)).toBeVisible();
+    await expect(page.getByText(/you are not signed in/i)).toBeVisible();
+    await expect(page.getByText("Personal workspace", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign in to search" })).toHaveAttribute("href", "/login?returnTo=%2Fsearch");
+  });
+
   test("a misconfigured production deployment fails closed", async ({ page }) => {
     test.skip(process.env.E2E_PRODUCTION_MISCONFIGURED !== "true", "Only applies to the production preflight run.");
     await page.goto("/dashboard");

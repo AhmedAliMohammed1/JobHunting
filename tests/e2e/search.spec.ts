@@ -9,7 +9,7 @@ test.describe("job search suite", () => {
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByText("DEVELOPMENT FIXTURE").first()).toBeVisible();
     await expect(page.getByText(/not live listings/i)).toBeVisible();
-    await expect(page.getByRole("link", { name: /View on/i }).first()).toHaveAttribute("target", "_blank");
+    await expect(page.getByRole("link", { name: "Open Job" }).first()).toHaveAttribute("target", "_blank");
   });
 
   test("natural-language constraints are interpreted instead of discarded", async ({ page }) => {
@@ -35,13 +35,16 @@ test.describe("job search suite", () => {
     await expect(page.getByText("Arc & Field")).toHaveCount(0);
   });
 
-  test("shows source availability instead of presenting restricted sites as active", async ({ page }) => {
+  test("shows optional and discovery-aware source availability without obsolete partnership errors", async ({ page }) => {
     const sourceSummary = page.getByText(/Search sources:/);
     await expect(sourceSummary).toBeVisible();
     await sourceSummary.click();
     await expect(page.getByText("Remote OK", { exact: true })).toBeVisible();
     await expect(page.getByText("LinkedIn", { exact: true })).toBeVisible();
-    await expect(page.getByText("Partner access needed").first()).toBeVisible();
+    await expect(page.getByText("Optional source").first()).toBeVisible();
+    await expect(page.getByText("Partner access needed")).toHaveCount(0);
+    await expect(page.getByText("Company boards needed")).toHaveCount(0);
+    await expect(page.getByText("API key needed")).toHaveCount(0);
   });
 
   test("durable save actions enforce authentication", async ({ page }) => {

@@ -2,19 +2,18 @@ import { z } from "zod";
 import type { JobProvider } from "@/src/types/jobs";
 import { normalizedJob } from "../normalize";
 
-const responseSchema = z.object({
-  data: z.array(z.object({
-    slug: z.string(),
-    company_name: z.string(),
-    title: z.string(),
-    description: z.string().optional(),
-    remote: z.boolean().default(false),
-    url: z.string().url(),
-    tags: z.array(z.string()).default([]),
-    job_types: z.array(z.string()).default([]),
-    location: z.string().optional(),
-    created_at: z.number().int().positive(),
-  })),
+const responseSchema = z.object({ data: z.array(z.unknown()) });
+const jobSchema = z.object({
+  slug: z.string(),
+  company_name: z.string(),
+  title: z.string(),
+  description: z.string().nullish(),
+  remote: z.boolean().nullish().transform((value) => value ?? false),
+  url: z.string().url(),
+  tags: z.array(z.string()).nullish().transform((value) => value ?? []),
+  job_types: z.array(z.string()).nullish().transform((value) => value ?? []),
+  location: z.string().nullish(),
+  created_at: z.number().int().positive(),
 });
 
 function sourceCountry(url: string): string {
@@ -33,14 +32,19 @@ export const arbeitnowProvider: JobProvider = {
     });
     if (!response.ok) throw new Error(`Arbeitnow returned ${response.status}`);
     const body = responseSchema.parse(await response.json());
-    return body.data.map((job) => normalizedJob({
+    const rows = body.data.flatMap((row) => {
+      const parsed = jobSchema.safeParse(row);
+      return parsed.success ? [parsed.data] : [];
+    });
+    if (!rows.length && body.data.length) throw new Error("Arbeitnow returned no valid job rows");
+    return rows.map((job) => normalizedJob({
       provider: "arbeitnow",
       externalId: job.slug,
       title: job.title,
       company: job.company_name,
-      location: job.remote ? `${job.location || sourceCountry(job.url)} · Remote` : job.location,
+      location: job.remote ? `${job.location || sourceCountry(job.url)} · Remote` : job.location ?? undefined,
       country: sourceCountry(job.url),
-      description: job.description,
+      description: job.description ?? undefined,
       employmentType: job.job_types[0],
       skills: job.tags,
       postedAt: new Date(job.created_at * 1_000).toISOString(),

@@ -11,4 +11,15 @@ test.describe("runtime API suite", () => {
       const response = await request.get(path); expect(response.status(), path).toBe(401);
     }
   });
+
+  test("public job search enforces query and structured filters", async ({ request }) => {
+    const response = await request.post("/api/jobs/search", {
+      data: { query: "TypeScript engineer", filters: { workplaceTypes: ["remote"], limit: 10 } },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = await response.json();
+    expect(body.jobs.length).toBeGreaterThan(0);
+    expect(body.jobs.every((job: { workplaceType: string }) => job.workplaceType === "remote")).toBe(true);
+    expect(body.jobs.some((job: { company: string }) => job.company === "Arc & Field")).toBe(false);
+  });
 });

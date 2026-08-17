@@ -23,6 +23,7 @@ test.describe("job search suite", () => {
     await page.getByLabel("Freshness").selectOption("24");
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByText(/roles returned|not live listings|provider/i).first()).toBeVisible();
+    await expect(page.getByText("Arc & Field")).toHaveCount(0);
   });
 
   test("durable save actions enforce authentication", async ({ page }) => {

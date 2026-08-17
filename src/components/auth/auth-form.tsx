@@ -129,7 +129,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <p>{copy[mode].subtitle}</p>
 
           {configurationMissing ? (
-            <div className="auth-notice">Development preview: connect Supabase to enable sign-in.</div>
+            <div className="auth-notice">Authentication setup required: connect Supabase to enable sign-in.</div>
           ) : null}
           {message ? <div className="auth-success" role="status">{message}</div> : null}
           {error || initialError ? <div className="auth-error" role="alert">{error ?? initialError}</div> : null}

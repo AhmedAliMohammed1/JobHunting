@@ -7,14 +7,22 @@ test.describe("authentication suite", () => {
     await expect(page).toHaveURL(/\/login\?error=configuration/);
     await expect(page.locator(".auth-error")).toContainText(/not configured/i);
   });
-  test("login exposes email, password, recovery, registration, and configuration state", async ({ page }) => {
+  test("login exposes email, password, recovery, registration, and configuration state", async ({ page, request }) => {
+    const configuration = await request.get("/api/config/status");
+    const { services } = await configuration.json() as { services: { auth: boolean } };
     await page.goto("/login");
     await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
     await expect(page.getByLabel("Email address")).toHaveAttribute("type", "email");
     await expect(page.getByLabel("Password")).toHaveAttribute("minlength", "8");
     await expect(page.getByRole("link", { name: /forgot password/i })).toHaveAttribute("href", "/forgot-password");
     await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute("href", "/register");
-    await expect(page.getByText(/connect Supabase to enable sign-in/i)).toBeVisible();
+    const setupNotice = page.getByText(/connect Supabase to enable sign-in/i);
+    if (services.auth) {
+      await expect(setupNotice).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+    } else {
+      await expect(setupNotice).toBeVisible();
+    }
   });
 
   test("registration enforces the stronger new-password policy", async ({ page }) => {

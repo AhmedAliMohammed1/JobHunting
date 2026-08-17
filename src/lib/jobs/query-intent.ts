@@ -3,9 +3,12 @@ import type { JobSearchQuery, WorkplaceType } from "@/src/types/jobs";
 type SearchIntent = Partial<Omit<JobSearchQuery, "limit">>;
 
 const ROLE_FAMILIES: Array<{ pattern: RegExp; roles: string[] }> = [
-  { pattern: /\b(?:artificial intelligence|ai|llm|large language model|nlp|natural language processing)\b/i, roles: ["AI Engineer", "Machine Learning Engineer", "NLP Engineer", "LLM Engineer", "Applied AI Engineer", "Generative AI Engineer", "AI Software Engineer", "ML Engineer"] },
+  { pattern: /\b(?:artificial intelligence|ai|ki|künstliche intelligenz|llm|large language model|nlp|natural language processing)\b/i, roles: ["AI Engineer", "Machine Learning Engineer", "NLP Engineer", "LLM Engineer", "Applied AI Engineer", "Generative AI Engineer", "AI Software Engineer", "ML Engineer"] },
   { pattern: /\bmachine learning\b|\bml engineer/i, roles: ["Machine Learning Engineer", "ML Engineer", "Applied Scientist"] },
   { pattern: /\bdata scien(?:ce|tist)\b/i, roles: ["Data Scientist", "Machine Learning Engineer", "Applied Scientist"] },
+  { pattern: /\bdata engineer(?:ing)?\b/i, roles: ["Data Engineer", "Data Platform Engineer"] },
+  { pattern: /\bcomputer vision\b/i, roles: ["Computer Vision Engineer", "Machine Learning Engineer"] },
+  { pattern: /\bsoftware(?:entwickler| engineer| developer)?\b/i, roles: ["Software Engineer", "Software Developer", "Softwareentwickler"] },
   { pattern: /\bfront[ -]?end\b/i, roles: ["Frontend Engineer", "Frontend Developer", "UI Engineer"] },
   { pattern: /\bback[ -]?end\b/i, roles: ["Backend Engineer", "Backend Developer", "Server Engineer"] },
   { pattern: /\bfull[ -]?stack\b/i, roles: ["Full Stack Engineer", "Full Stack Developer", "Product Engineer"] },
@@ -15,12 +18,13 @@ const ROLE_FAMILIES: Array<{ pattern: RegExp; roles: string[] }> = [
 ];
 
 const TECHNOLOGIES = [
-  "TypeScript", "JavaScript", "React", "Next.js", "Node.js", "Python", "Java", "C#", ".NET", "Go", "Rust",
-  "AWS", "Azure", "GCP", "Docker", "Kubernetes", "PostgreSQL", "SQL", "GraphQL", "PyTorch", "TensorFlow",
+  "TypeScript", "JavaScript", "React", "Next.js", "Node.js", "Python", "Java", "C++", "C#", ".NET", "Go", "Rust",
+  "AWS", "Azure", "GCP", "Docker", "Kubernetes", "PostgreSQL", "SQL", "GraphQL", "PyTorch", "TensorFlow", "LLM", "NLP",
 ];
 
 const COUNTRY_ALIASES: Array<[RegExp, string]> = [
   [/\bgermany\b|\bdeutschland\b/i, "Germany"],
+  [/\begypt\b|\bمصر\b/i, "Egypt"],
   [/\bunited kingdom\b|\bgreat britain\b|\b(?:the )?uk\b|\bengland\b/i, "United Kingdom"],
   [/\bunited states\b|\busa\b|\bu\.s\.a?\.?\b/i, "United States"],
   [/\bfrance\b/i, "France"], [/\bnetherlands\b|\bholland\b/i, "Netherlands"],
@@ -40,16 +44,20 @@ function unique(values: Array<string | undefined>): string[] {
 function inferPostedWithinHours(text: string): number | undefined {
   const hours = text.match(/\b(?:last|past|within)\s+(\d{1,4})\s*(?:hours?|hrs?)\b/i);
   if (hours) return Number(hours[1]);
+  const days = text.match(/\b(?:last|past|within)\s+(\d{1,3})\s*days?\b/i);
+  if (days) return Number(days[1]) * 24;
   if (/\b(?:today|last|past)\s+(?:24\s*hours?|day)\b/i.test(text)) return 24;
+  if (/\b(?:last|past)\s+3\s+days\b/i.test(text)) return 72;
   if (/\b(?:this|last|past)\s+week\b/i.test(text)) return 168;
+  if (/\b(?:last|past)\s+14\s+days\b/i.test(text)) return 336;
   if (/\b(?:this|last|past)\s+month\b/i.test(text)) return 720;
   return undefined;
 }
 
 function inferExperienceLevels(text: string): string[] {
   const levels: string[] = [];
-  if (/\b(?:intern|internship)\b/i.test(text)) levels.push("Internship", "Intern");
-  if (/\bworking[ -]?student\b/i.test(text)) levels.push("Working student");
+  if (/\b(?:intern|internship|praktikum)\b/i.test(text)) levels.push("Internship", "Intern");
+  if (/\bworking[ -]?student\b|\bwerkstudent(?:in)?\b/i.test(text)) levels.push("Working student");
   if (/\b(?:entry[ -]?level|graduate|new grad)\b/i.test(text)) levels.push("Entry level", "Junior");
   if (/\bjunior\b/i.test(text)) levels.push("Junior", "Entry level");
   if (/\bmid[ -]?(?:level|senior)?\b/i.test(text)) levels.push("Mid level");
@@ -60,27 +68,30 @@ function inferExperienceLevels(text: string): string[] {
 
 function inferEmploymentTypes(text: string): string[] {
   const types: string[] = [];
-  if (/\bfull[ -]?time\b/i.test(text)) types.push("Full-time");
-  if (/\bpart[ -]?time\b/i.test(text)) types.push("Part-time");
+  if (/\bfull[ -]?time\b|\bvollzeit\b/i.test(text)) types.push("Full-time");
+  if (/\bpart[ -]?time\b|\bteilzeit\b/i.test(text)) types.push("Part-time");
+  if (/\bworking[ -]?student\b|\bwerkstudent(?:in)?\b/i.test(text)) types.push("Working Student");
   if (/\bcontract(?:or)?\b/i.test(text)) types.push("Contract");
   if (/\bfreelance\b/i.test(text)) types.push("Freelance");
   if (/\btemporary\b|\btemp\b/i.test(text)) types.push("Temporary");
-  if (/\b(?:intern|internship)\b/i.test(text)) types.push("Internship");
+  if (/\b(?:intern|internship|praktikum)\b/i.test(text)) types.push("Internship");
   return unique(types);
 }
 
 function inferWorkplaceTypes(text: string): WorkplaceType[] {
   const types: WorkplaceType[] = [];
-  if (/\bremote\b|work from home/i.test(text)) types.push("remote");
+  if (/\bremote\b|work from home|homeoffice/i.test(text)) types.push("remote");
   if (/\bhybrid\b/i.test(text)) types.push("hybrid");
-  if (/\bon[ -]?site\b|in[ -]?office/i.test(text)) types.push("onsite");
+  if (/\bon[ -]?site\b|in[ -]?office|vor ort/i.test(text)) types.push("onsite");
   return [...new Set(types)];
 }
 
 function inferLocations(text: string, countries: string[]): string[] {
   const regions = REGION_ALIASES.filter(([pattern]) => pattern.test(text)).map(([, region]) => region);
+  const knownCities = ["Munich", "München", "Darmstadt", "Frankfurt", "Berlin", "Hamburg", "Stuttgart", "Ingolstadt", "Erlangen", "Nuremberg", "Nürnberg", "Cologne", "Köln", "Düsseldorf", "Cairo", "Giza", "New Cairo", "6th of October", "Alexandria", "Smart Village"];
+  const city = knownCities.find((candidate) => new RegExp(`\\b${candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text));
   const match = text.match(/\bin\s+([\p{L}][\p{L} .'-]{1,60}?)(?=\s+(?:posted|from|during|within|that|which|with|and\s+(?:remote|hybrid|on[ -]?site))\b|[,;.]|$)/iu);
-  const location = match?.[1]?.trim();
+  const location = city ?? match?.[1]?.trim();
   if (!location || /^the\s+(?:last|past)\b/i.test(location) || countries.some((country) => country.toLowerCase() === location.toLowerCase())) return unique(regions);
   return unique([...regions, location]);
 }
@@ -92,18 +103,18 @@ function inferRolesAndKeywords(text: string, candidateRoles: string[]): Pick<Sea
     return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(text);
   });
 
-  if (!roles.length && /\bengineer(?:ing)?\b|\bdeveloper\b/i.test(text)) {
-    roles.push(/\bdeveloper\b/i.test(text) ? "Developer" : "Engineer");
+  if (!roles.length && /\bengineer(?:ing)?\b|\bdeveloper\b|\bentwickler\b/i.test(text)) {
+    roles.push(/\bdeveloper|entwickler\b/i.test(text) ? "Developer" : "Engineer");
   }
 
   if (!roles.length) {
     const cleaned = text
       .replace(/^(?:find|show me|search(?: for)?|looking for|i want)\s+/i, "")
-      .replace(/\b(?:jobs?|roles?|positions?|vacancies)\b/gi, " ")
-      .replace(/\b(?:junior|senior|entry[ -]?level|graduate|new grad|remote|hybrid|on[ -]?site|full[ -]?time|part[ -]?time)\b/gi, " ")
+      .replace(/\b(?:jobs?|roles?|positions?|vacancies|stellen)\b/gi, " ")
+      .replace(/\b(?:junior|senior|entry[ -]?level|graduate|new grad|remote|hybrid|on[ -]?site|full[ -]?time|part[ -]?time|working[ -]?student|werkstudent|praktikum|vollzeit|teilzeit)\b/gi, " ")
       .replace(/\b(?:posted|from|during|within|that|which|with)\b[\s\S]*$/i, " ")
       .replace(/\s+/g, " ").trim();
-    if (cleaned && !/^(?:in\s+)?(?:germany|europe|worldwide|the uk|united kingdom)$/i.test(cleaned)) roles.push(cleaned);
+    if (cleaned && !/^(?:in\s+)?(?:germany|egypt|europe|worldwide|the uk|united kingdom)$/i.test(cleaned)) roles.push(cleaned);
   }
 
   if (!roles.length && /\b(?:fit|match)(?:s|es)?\s+my\s+(?:cv|profile|resume)\b/i.test(text)) roles.push(...candidateRoles);

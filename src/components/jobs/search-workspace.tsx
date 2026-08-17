@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import type { NormalizedJob } from "@/src/types/jobs";
 import { SaveJobButton } from "./save-job-button";
 import { splitList } from "@/src/lib/validation/product";
 
+const subscribeToHydration = () => () => {};
+
 export function SearchWorkspace() {
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [query, setQuery] = useState("TypeScript product engineer remote Europe");
   const [jobs, setJobs] = useState<NormalizedJob[]>([]);
   const [notice, setNotice] = useState("Development mode uses clearly labeled local fixtures.");
@@ -38,7 +41,7 @@ export function SearchWorkspace() {
   }
 
   return <div className="search-workspace">
-    <form className="search-bar" onSubmit={(event) => { event.preventDefault(); search(); }}><Search size={20} /><input aria-label="Search roles" value={query} onChange={(event) => setQuery(event.target.value)} required /><button type="submit" disabled={loading}>{loading ? "Searching…" : "Search"}</button></form>
+    <form className="search-bar" onSubmit={(event) => { event.preventDefault(); search(); }}><Search size={20} /><input aria-label="Search roles" value={query} onChange={(event) => setQuery(event.target.value)} required /><button type="submit" disabled={!hydrated || loading}>{loading ? "Searching…" : "Search"}</button></form>
     <div className="search-toolbar"><button className="text-button" type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}><SlidersHorizontal size={16} /> Filters</button><strong role="status">{notice}</strong><button className="secondary-button" type="button" onClick={saveSearch}>Save search</button></div>
     {filtersOpen ? <div className="filter-panel"><label>Locations<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Berlin, Remote in Europe" /></label><label>Workplace<select value={workplace} onChange={(event) => setWorkplace(event.target.value)}><option value="">Any</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">On-site</option></select></label><label>Freshness<select value={postedWithin} onChange={(event) => setPostedWithin(event.target.value)}><option value="24">Past day</option><option value="168">Past week</option><option value="720">Past month</option><option value="">Any</option></select></label></div> : null}
     {savedSearchMessage ? <p className="form-status" role="status">{savedSearchMessage}</p> : null}

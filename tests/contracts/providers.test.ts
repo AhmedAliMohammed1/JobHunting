@@ -10,6 +10,7 @@ describe("job-provider contract", () => {
     for (const job of jobs) {
       expect(normalizedJobInputSchema.safeParse(job).success).toBe(true);
       expect(job.provider).toBe("mock");
+      expect(job.employmentType).toBe("Full-time");
       expect(new URL(job.sourceUrl).protocol).toBe("https:");
     }
   });

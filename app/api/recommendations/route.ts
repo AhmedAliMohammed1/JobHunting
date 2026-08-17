@@ -26,5 +26,13 @@ export async function GET() {
   };
   const query = jobSearchSchema.parse({ roles: profile.preferredRoles, countries: profile.preferredCountries, locations: profile.preferredLocations, employmentTypes: profile.employmentTypes, workplaceTypes: profile.workplaceTypes, limit: 25 });
   const result = await searchJobs(query);
+  if (!result.jobs.length) {
+    return NextResponse.json({
+      recommendations: [],
+      reason: "No jobs match all of your current role, location, employment, and workplace preferences. Try broadening one preference.",
+      partial: result.partial,
+      providers: result.providers.map((provider) => provider.health),
+    });
+  }
   return NextResponse.json({ recommendations: rankJobs(profile, result.jobs).slice(0, 20), partial: result.partial, providers: result.providers.map((provider) => provider.health) });
 }

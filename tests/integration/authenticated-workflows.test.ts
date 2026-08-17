@@ -14,6 +14,7 @@ import { POST as uploadCv } from "@/app/api/cv/upload/route";
 import { POST as saveJob } from "@/app/api/jobs/saved/route";
 import { PATCH as markNotification } from "@/app/api/notifications/route";
 import { PUT as saveProfile } from "@/app/api/profile/route";
+import { GET as getRecommendations } from "@/app/api/recommendations/route";
 import { POST as saveSearch } from "@/app/api/searches/route";
 import { PUT as saveAutomation } from "@/app/api/settings/automation/route";
 
@@ -41,6 +42,22 @@ describe("authenticated workflow API integration", () => {
     const database = client(); mocks.createClient.mockResolvedValue(database);
     const response = await saveProfile(jsonRequest("http://localhost/api/profile", "PUT", { fullName: "Sam", currentTitle: "Engineer", location: "Cairo", summary: "Builder", skills: ["TypeScript"], preferredRoles: ["Engineer"], preferredCountries: [], preferredLocations: ["Remote"], employmentTypes: ["Full-time"], workplaceTypes: ["remote"], yearsExperience: 4 }));
     expect(response.status).toBe(200); expect(database.from).toHaveBeenCalledWith("candidate_profiles");
+  });
+
+  it("returns ranked recommendations for persisted profile preferences", async () => {
+    const database = client([{ data: {
+      id: "profile", full_name: "Sam", current_title: "Engineer", location: "Cairo", summary: "Builder",
+      skills: [{ name: "TypeScript", source: "user" }], years_experience: 4,
+      preferred_roles: ["Frontend Engineer"], preferred_countries: ["Germany"], preferred_locations: ["Berlin"],
+      employment_types: ["Full-time"], workplace_types: ["remote"], manual_fields: ["preferences"],
+    }, error: null }]);
+    mocks.createClient.mockResolvedValue(database);
+
+    const response = await getRecommendations();
+    const body = await response.json() as { recommendations: Array<{ job: { title: string } }> };
+
+    expect(response.status).toBe(200);
+    expect(body.recommendations.map(({ job }) => job.title)).toContain("Senior Frontend Engineer");
   });
 
   it("persists and saves a normalized job", async () => {

@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { Bell, Bot, KeyRound } from "lucide-react";
+import { SectionShell } from "@/src/components/dashboard/section-shell";
+export default function Page(){return <SectionShell eyebrow="Settings" title="Workspace controls" description="Manage notification channels, provider health, and the gates around automation."><div className="settings-grid"><Link className="product-card card-link" href="/settings/auto-apply"><Bot/><h2>Auto-apply safety</h2><p>Simulation, allowlists, limits, and human checkpoints.</p></Link><Link className="product-card card-link" href="/notifications"><Bell/><h2>Notifications</h2><p>Verified destinations and delivery history.</p></Link><article className="product-card"><KeyRound/><h2>Credentials</h2><p>Application-site passwords are never stored.</p></article></div></SectionShell>}

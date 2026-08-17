@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { SectionShell } from "@/src/components/dashboard/section-shell";
+const roles=[{score:94,title:"Machine Learning Engineer",company:"Northbeam Labs",why:"Python, NLP and target location align"},{score:89,title:"Applied AI Engineer",company:"Morrow Intelligence",why:"LLM and RAG experience align"},{score:84,title:"Junior NLP Engineer",company:"Aperture Cloud",why:"NLP skills align; seniority needs review"}];
+export default function Page(){return <SectionShell eyebrow="Recommended · sample ranking" title="Matches you can audit." description="These examples demonstrate deterministic, versioned scores decomposed into visible factors."><div className="recommendation-list">{roles.map((role)=><article className="result-card" key={role.title}><strong className="match-score">{role.score}%</strong><div><h2>{role.title}</h2><p>{role.company} · {role.why}</p></div><Link href="/search">Run a search</Link></article>)}</div></SectionShell>}

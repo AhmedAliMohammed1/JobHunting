@@ -6,7 +6,7 @@ export function jobProviderCatalog(env: ServerEnv): JobProviderCatalogEntry[] {
   const adzunaReady = Boolean(env.ADZUNA_APP_ID && env.ADZUNA_APP_KEY);
   const joobleReady = Boolean(env.JOOBLE_API_KEY);
   const discoveryReady = Boolean(env.TAVILY_API_KEY);
-  const configuredAts = new Set(parseCareerSources(env.JOB_CAREER_SOURCES_JSON).map((source) => source.provider === "successfactors" ? "sap-successfactors" : source.provider));
+  const configuredAts = new Set<string>(parseCareerSources(env.JOB_CAREER_SOURCES_JSON).map((source) => source.provider === "successfactors" ? "sap-successfactors" : source.provider));
 
   const discoveryEntry = (id: string, name: string, coverage: JobProviderCatalogEntry["coverage"] = "global"): JobProviderCatalogEntry => ({
     id,

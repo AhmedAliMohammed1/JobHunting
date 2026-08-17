@@ -6,15 +6,25 @@ export type JobFreshnessStatus =
   | "REMOVED"
   | "UNKNOWN";
 
+export type JobSourceType =
+  | "official-api"
+  | "public-ats"
+  | "approved-feed"
+  | "search-discovery"
+  | "career-page"
+  | "mock";
+
 export interface NormalizedJob {
   id: string;
   externalId?: string;
   provider: string;
+  sourceType?: JobSourceType;
   title: string;
   company: string;
   companyLogo?: string;
   location?: string;
   country?: string;
+  city?: string;
   workplaceType: WorkplaceType;
   employmentType?: string;
   seniority?: string;
@@ -23,6 +33,7 @@ export interface NormalizedJob {
   salaryCurrency?: string;
   salaryText?: string;
   description?: string;
+  snippet?: string;
   skills: string[];
   postedAt?: string;
   firstDiscoveredAt: string;
@@ -66,16 +77,16 @@ export interface ProviderHealth {
 export interface JobProvider {
   id: string;
   name: string;
-  sourceType: "official-api" | "public-ats" | "approved-feed" | "mock";
+  sourceType: JobSourceType;
   search(query: JobSearchQuery, signal?: AbortSignal): Promise<NormalizedJob[]>;
   healthCheck?(signal?: AbortSignal): Promise<ProviderHealth>;
 }
 
 export type JobProviderAvailability =
   | "active"
-  | "needs-api-key"
-  | "needs-company-board"
-  | "partner-access"
+  | "optional"
+  | "discovery"
+  | "ats-discovery"
   | "restricted";
 
 export interface JobProviderCatalogEntry {

@@ -4,7 +4,7 @@ import { GET as getHealth } from "@/app/api/health/route";
 import { POST as search } from "@/app/api/jobs/search/route";
 
 describe("public API integration", () => {
-  afterEach(() => { delete process.env.NEXT_PUBLIC_SUPABASE_URL; delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY; });
+  afterEach(() => { delete process.env.NEXT_PUBLIC_SUPABASE_URL; delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY; delete process.env.TAVILY_API_KEY; });
 
   it("reports missing deployment dependencies without leaking secrets", async () => {
     const response = await getConfig(); const body = await response.json();
@@ -12,7 +12,7 @@ describe("public API integration", () => {
     expect(JSON.stringify(body)).not.toContain("SUPABASE_SECRET_KEY");
     expect(body).not.toHaveProperty("environment");
     expect(body.providerCatalog.find((provider: { id: string }) => provider.id === "remote-ok")).toMatchObject({ availability: "active" });
-    expect(body.providerCatalog.find((provider: { id: string }) => provider.id === "linkedin")).toMatchObject({ availability: "partner-access" });
+    expect(body.providerCatalog.find((provider: { id: string }) => provider.id === "linkedin")).toMatchObject({ availability: "optional" });
   });
 
   it("returns a no-store health response", async () => {

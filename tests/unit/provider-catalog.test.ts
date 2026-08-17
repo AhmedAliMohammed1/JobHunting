@@ -7,26 +7,37 @@ describe("job provider catalog", () => {
     delete process.env.ADZUNA_APP_ID;
     delete process.env.ADZUNA_APP_KEY;
     delete process.env.JOOBLE_API_KEY;
+    delete process.env.TAVILY_API_KEY;
+    delete process.env.JOB_CAREER_SOURCES_JSON;
     delete process.env.ENABLE_REMOTE_OK;
   });
 
-  it("distinguishes active feeds from sources requiring access", () => {
+  it("treats missing optional credentials as non-fatal setup", () => {
     const catalog = jobProviderCatalog(getServerEnv());
     expect(catalog.find(({ id }) => id === "arbeitnow")?.availability).toBe("active");
     expect(catalog.find(({ id }) => id === "remote-ok")?.availability).toBe("active");
-    expect(catalog.find(({ id }) => id === "adzuna")?.availability).toBe("needs-api-key");
-    expect(catalog.find(({ id }) => id === "greenhouse")?.availability).toBe("needs-company-board");
-    expect(catalog.find(({ id }) => id === "linkedin")?.availability).toBe("partner-access");
+    expect(catalog.find(({ id }) => id === "adzuna")?.availability).toBe("optional");
+    expect(catalog.find(({ id }) => id === "greenhouse")?.availability).toBe("optional");
+    expect(catalog.find(({ id }) => id === "linkedin")?.availability).toBe("optional");
     expect(catalog.find(({ id }) => id === "remotive")?.availability).toBe("restricted");
   });
 
-  it("marks credential-backed APIs active without exposing credential values", () => {
+  it("marks discovery-backed public sites and ATS sources enabled without exposing secrets", () => {
+    process.env.TAVILY_API_KEY = "tvly-super-secret";
     process.env.ADZUNA_APP_ID = "app-id";
-    process.env.ADZUNA_APP_KEY = "super-secret";
-    process.env.JOOBLE_API_KEY = "another-secret";
-    const serialized = JSON.stringify(jobProviderCatalog(getServerEnv()));
-    expect(serialized).toContain('"availability":"active"');
-    expect(serialized).not.toContain("super-secret");
-    expect(serialized).not.toContain("another-secret");
+    process.env.ADZUNA_APP_KEY = "adzuna-secret";
+    const catalog = jobProviderCatalog(getServerEnv());
+    expect(catalog.find(({ id }) => id === "linkedin")?.availability).toBe("discovery");
+    expect(catalog.find(({ id }) => id === "greenhouse")?.availability).toBe("ats-discovery");
+    expect(catalog.find(({ id }) => id === "adzuna")?.availability).toBe("active");
+    const serialized = JSON.stringify(catalog);
+    expect(serialized).not.toContain("tvly-super-secret");
+    expect(serialized).not.toContain("adzuna-secret");
+  });
+
+  it("marks an employer ATS active through the central registry even without discovery", () => {
+    process.env.JOB_CAREER_SOURCES_JSON = JSON.stringify([{ company: "Example", provider: "lever", identifier: "example" }]);
+    const catalog = jobProviderCatalog(getServerEnv());
+    expect(catalog.find(({ id }) => id === "lever")?.availability).toBe("ats-discovery");
   });
 });

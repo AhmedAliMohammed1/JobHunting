@@ -93,7 +93,7 @@ export function normalizedJob(input: {
     city: cleanText(input.city),
     workplaceType: input.workplaceType ?? inferWorkplaceType(input.location, description),
     employmentType: cleanText(input.employmentType),
-    seniority: cleanText(input.seniority) ?? inferSeniority(input.title, description),
+    seniority: cleanText(input.seniority) ?? inferSeniority(input.title) ?? inferSeniority(description),
     salaryText: cleanText(input.salaryText),
     salaryMin: input.salaryMin,
     salaryMax: input.salaryMax,

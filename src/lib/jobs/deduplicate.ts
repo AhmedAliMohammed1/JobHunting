@@ -8,7 +8,7 @@ export function canonicalJobUrl(value: string): string {
   try {
     const url = new URL(value);
     url.hash = "";
-    const tracking = [/^utm_/i, /^trk$/i, /^tracking/i, /^ref$/i, /^refid$/i, /^lipi$/i, /^midtoken$/i, /^eBP$/i, /^source$/i, /^from$/i];
+    const tracking = [/^utm_/i, /^trk$/i, /^tracking/i, /^ref$/i, /^refid$/i, /^lipi$/i, /^midtoken$/i, /^ebp$/i, /^source$/i, /^from$/i];
     for (const key of [...url.searchParams.keys()]) {
       if (tracking.some((pattern) => pattern.test(key))) url.searchParams.delete(key);
     }
@@ -47,17 +47,13 @@ function better(left: NormalizedJob, right: NormalizedJob): NormalizedJob {
 }
 
 export function deduplicateJobs(jobs: NormalizedJob[]): NormalizedJob[] {
-  const byIdentity = new Map<string, NormalizedJob>();
-  const byUrl = new Map<string, NormalizedJob>();
-
+  const unique: NormalizedJob[] = [];
   for (const job of jobs) {
     const url = canonicalJobUrl(job.sourceUrl);
     const identity = identityKey(job);
-    const existing = byUrl.get(url) ?? byIdentity.get(identity);
-    const selected = existing ? better(job, existing) : job;
-    byUrl.set(url, selected);
-    byIdentity.set(identity, selected);
+    const index = unique.findIndex((existing) => canonicalJobUrl(existing.sourceUrl) === url || identityKey(existing) === identity);
+    if (index === -1) unique.push(job);
+    else unique[index] = better(job, unique[index]);
   }
-
-  return [...new Set([...byIdentity.values(), ...byUrl.values()])];
+  return unique;
 }

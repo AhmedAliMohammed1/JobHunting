@@ -196,13 +196,18 @@ export function isLikelyJobUrl(url: string): boolean {
     const parsed = new URL(url);
     const source = detectJobSource(url);
     const path = `${parsed.pathname}${parsed.search}`.toLowerCase();
+    const segments = parsed.pathname.split("/").filter(Boolean);
     if (/\/(?:login|signin|privacy|terms|blog|news)(?:\/|$)/.test(path)) return false;
     if (source === "linkedin") return /\/jobs\/view\//.test(path);
     if (source === "indeed") return /\/viewjob|\/pagead\//.test(path);
     if (source === "stepstone") return /\/stellenangebote|\/job\//.test(path);
     if (source === "xing") return /\/jobs\//.test(path);
     if (source === "glassdoor") return /\/job-listing\/|\/partner\/joblisting/.test(path);
-    if (source !== "career-page") return /\/job|\/jobs|\/position|\/posting|\/career/.test(path);
+    if (["lever", "ashby"].includes(source)) return segments.length >= 2;
+    if (source === "greenhouse") return /\/jobs?\//.test(path) || segments.length >= 2;
+    if (source === "smartrecruiters") return segments.length >= 3;
+    if (source === "personio") return /\/job\//.test(path) || segments.length >= 2;
+    if (source === "workday" || source === "sap-successfactors") return /\/job|\/jobs|career|job_req_id/.test(path);
     return /\/(?:jobs?|positions?|vacancies|careers?)\/(?:[^/?#]+)?/.test(path) && !/\/(?:jobs?|careers?)\/?$/.test(parsed.pathname.toLowerCase());
   } catch {
     return false;
@@ -268,6 +273,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
         });
         return searchProvider.search(searchQuery, { includeDomains: group.domains, postedWithinHours: query.postedWithinHours, maxResults: Math.min(20, query.limit) }, signal);
       }));
+      if (settled.every((result) => result.status === "rejected")) throw new Error("All discovery searches failed");
       const rows = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       return rows
         .filter((result) => (result.score ?? 1) >= 0.35 && isLikelyJobUrl(result.url))

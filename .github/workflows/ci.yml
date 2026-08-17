@@ -22,7 +22,7 @@ jobs:
       - run: npm run worker:check
       - run: npm test
       - name: Live public job search smoke test
-        run: npx vitest run tests/live/job-search-live.test.ts
+        run: RUN_LIVE_JOB_TESTS=true npx vitest run tests/integration/live-job-search.test.ts
       - run: npm run build
 
   browser:

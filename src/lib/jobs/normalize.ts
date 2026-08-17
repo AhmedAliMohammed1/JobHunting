@@ -12,10 +12,12 @@ export function cleanText(value: unknown): string | undefined {
 }
 
 export function inferWorkplaceType(...values: Array<string | undefined>): WorkplaceType {
-  const text = values.filter(Boolean).join(" ").toLowerCase();
-  if (/\bremote\b|work from home|distributed/.test(text)) return "remote";
-  if (/\bhybrid\b/.test(text)) return "hybrid";
-  if (/\bon[ -]?site\b|in office/.test(text)) return "onsite";
+  for (const value of values) {
+    const text = value?.toLowerCase() ?? "";
+    if (/\bhybrid\b/.test(text)) return "hybrid";
+    if (/\bremote\b|work from home|distributed/.test(text)) return "remote";
+    if (/\bon[ -]?site\b|in office/.test(text)) return "onsite";
+  }
   return "unknown";
 }
 
@@ -75,7 +77,7 @@ export function normalizedJob(input: {
     country: cleanText(input.country),
     workplaceType: input.workplaceType ?? inferWorkplaceType(input.location, description),
     employmentType: cleanText(input.employmentType),
-    seniority: cleanText(input.seniority) ?? inferSeniority(input.title, description),
+    seniority: cleanText(input.seniority) ?? inferSeniority(input.title),
     salaryText: cleanText(input.salaryText),
     description,
     skills: [...new Set([...inferSkills(description), ...(input.skills ?? []).map((skill) => cleanText(skill)).filter((skill): skill is string => Boolean(skill))])],

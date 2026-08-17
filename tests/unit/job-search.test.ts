@@ -34,13 +34,19 @@ function query(overrides: Partial<JobSearchQuery> = {}): JobSearchQuery {
 
 describe("job search result filtering", () => {
   it("matches a multi-word phrase using the title and skills", () => {
-    expect(jobMatchesQuery(job, query({ roles: ["TypeScript engineer"] }), now)).toBe(true);
+    expect(jobMatchesQuery(job, query({ roles: ["Frontend engineer"] }), now)).toBe(true);
     expect(jobMatchesQuery(job, query({ roles: ["machine learning"] }), now)).toBe(false);
   });
 
   it("requires both the role group and the keyword group", () => {
     expect(jobMatchesQuery(job, query({ roles: ["Engineer"], keywords: ["TypeScript"] }), now)).toBe(true);
     expect(jobMatchesQuery(job, query({ roles: ["Engineer"], keywords: ["Python"] }), now)).toBe(false);
+  });
+
+  it("does not match a role mentioned only incidentally in the description", () => {
+    const analyst = { ...job, title: "Data Analyst", description: "Partner with software engineers using TypeScript." };
+    expect(jobMatchesQuery(analyst, query({ roles: ["Engineer"] }), now)).toBe(false);
+    expect(jobMatchesQuery(analyst, query({ roles: ["Data Analyst"], keywords: ["TypeScript"] }), now)).toBe(true);
   });
 
   it("enforces location, workplace, company, employment, and seniority filters", () => {

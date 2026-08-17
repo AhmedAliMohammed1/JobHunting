@@ -15,16 +15,9 @@ function normalized(value: string | undefined): string {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/[^\p{L}\p{N}+#.]+/gu, " ").replace(/\s+/g, " ").trim() ?? "";
 }
 
-function matchesSearchPhrases(job: NormalizedJob, phrases: string[]): boolean {
+function matchesSearchPhrases(searchableValue: string, phrases: string[]): boolean {
   if (!phrases.length) return true;
-  const searchable = normalized([
-    job.title,
-    job.company,
-    job.description,
-    job.seniority,
-    ...job.skills,
-  ].filter(Boolean).join(" "));
-
+  const searchable = normalized(searchableValue);
   const padded = ` ${searchable} `;
   return phrases.some((phrase) => {
     const tokens = normalized(phrase).split(/\s+/).filter(Boolean);
@@ -37,8 +30,8 @@ function matchesAny(value: string, candidates: string[]): boolean {
 }
 
 export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): boolean {
-  if (!matchesSearchPhrases(job, query.roles)) return false;
-  if (!matchesSearchPhrases(job, query.keywords)) return false;
+  if (!matchesSearchPhrases(`${job.title} ${job.seniority ?? ""}`, query.roles)) return false;
+  if (!matchesSearchPhrases([job.title, job.company, job.description, ...job.skills].filter(Boolean).join(" "), query.keywords)) return false;
 
   const location = normalized(`${job.location ?? ""} ${job.country ?? ""}`);
   if (!matchesAny(location, query.locations)) return false;

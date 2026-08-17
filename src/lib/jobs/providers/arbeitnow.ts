@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { JobProvider } from "@/src/types/jobs";
-import { normalizedJob } from "../normalize";
+import { inferWorkplaceType, normalizedJob } from "../normalize";
 
 const responseSchema = z.object({ data: z.array(z.unknown()) });
 const jobSchema = z.object({
@@ -37,21 +37,28 @@ export const arbeitnowProvider: JobProvider = {
       return parsed.success ? [parsed.data] : [];
     });
     if (!rows.length && body.data.length) throw new Error("Arbeitnow returned no valid job rows");
-    return rows.map((job) => normalizedJob({
-      provider: "arbeitnow",
-      externalId: job.slug,
-      title: job.title,
-      company: job.company_name,
-      location: job.remote ? `${job.location || sourceCountry(job.url)} · Remote` : job.location ?? undefined,
-      country: sourceCountry(job.url),
-      description: job.description ?? undefined,
-      employmentType: job.job_types[0],
-      skills: job.tags,
-      postedAt: new Date(job.created_at * 1_000).toISOString(),
-      sourceUrl: job.url,
-      applicationUrl: job.url,
-      sourceDelayHours: 1,
-      workplaceType: job.remote ? "remote" : undefined,
-    }));
+    return rows.map((job) => {
+      const explicitWorkplace = inferWorkplaceType(job.location ?? undefined);
+      const workplaceType = explicitWorkplace === "unknown" ? (job.remote ? "remote" : undefined) : explicitWorkplace;
+      const location = workplaceType === "remote" && explicitWorkplace === "unknown"
+        ? `${job.location || sourceCountry(job.url)} · Remote`
+        : job.location ?? undefined;
+      return normalizedJob({
+        provider: "arbeitnow",
+        externalId: job.slug,
+        title: job.title,
+        company: job.company_name,
+        location,
+        country: sourceCountry(job.url),
+        description: job.description ?? undefined,
+        employmentType: job.job_types[0],
+        skills: job.tags,
+        postedAt: new Date(job.created_at * 1_000).toISOString(),
+        sourceUrl: job.url,
+        applicationUrl: job.url,
+        sourceDelayHours: 1,
+        workplaceType,
+      });
+    });
   },
 };

@@ -32,6 +32,16 @@ describe("Arbeitnow provider contract", () => {
     expect(jobs[0]).toMatchObject({ provider: "arbeitnow", skills: [] });
   });
 
+  it("keeps an explicit hybrid location when the feed also marks remote eligibility", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      slug: "hybrid-engineer", company_name: "Acme", title: "Software Engineer", remote: true,
+      url: "https://www.arbeitnow.com/jobs/hybrid-engineer", tags: [], job_types: ["Full-time"],
+      location: "Berlin · Hybrid", description: "Remote flexibility is available.", created_at: 1786989335,
+    }] }), { status: 200 })));
+    const jobs = await arbeitnowProvider.search(jobSearchSchema.parse({ roles: ["Engineer"] }));
+    expect(jobs[0]).toMatchObject({ workplaceType: "hybrid", location: "Berlin · Hybrid" });
+  });
+
   it("surfaces upstream failures for partial-result handling", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 503 })));
     await expect(arbeitnowProvider.search(jobSearchSchema.parse({ roles: ["Engineer"] }))).rejects.toThrow(/503/);

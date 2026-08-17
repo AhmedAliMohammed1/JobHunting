@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deduplicateJobs } from "@/src/lib/jobs/deduplicate";
 import { classifyFreshness } from "@/src/lib/jobs/freshness";
-import { normalizedJob } from "@/src/lib/jobs/normalize";
+import { inferWorkplaceType, normalizedJob } from "@/src/lib/jobs/normalize";
 
 function job(externalId: string, overrides: Partial<ReturnType<typeof normalizedJob>> = {}) {
   return { ...normalizedJob({ provider: "test", externalId, title: "Product Engineer", company: "Acme", location: "Berlin", sourceUrl: `https://jobs.example.com/${externalId}` }), ...overrides };
@@ -17,6 +17,12 @@ describe("job normalization", () => {
 
   it("deduplicates canonical company/title/location/source host", () => {
     expect(deduplicateJobs([job("1"), job("2")])).toHaveLength(1);
+  });
+
+  it("prioritizes explicit location workplace labels and title seniority", () => {
+    expect(inferWorkplaceType("Berlin · Hybrid", "Remote work may be available")).toBe("hybrid");
+    const normalized = normalizedJob({ provider: "test", externalId: "senior", title: "Senior Maintenance Engineer", company: "Acme", description: "Mentor junior engineers and lead projects.", sourceUrl: "https://jobs.example.com/senior" });
+    expect(normalized.seniority).toBe("Senior");
   });
 
   it("expires records that have not been verified in fourteen days", () => {

@@ -14,6 +14,7 @@ const serverEnvSchema = z.object({
   CRON_SECRET: z.string().min(24).optional(),
   AUTOMATION_WORKER_URL: z.string().url().optional(),
   AUTOMATION_WORKER_SECRET: z.string().min(24).optional(),
+  ENABLE_ARBEITNOW: z.enum(["true", "false"]).default("true"),
   ENABLE_REMOTIVE: z.enum(["true", "false"]).default("false"),
   JOB_PROVIDER_MODE: z.enum(["mock", "live"]).default("mock"),
   REMOTIVE_CACHE_TTL_SECONDS: z.coerce.number().int().min(900).default(21600),
@@ -34,4 +35,8 @@ export function isSupabaseConfigured(): boolean {
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   );
+}
+
+export function effectiveJobProviderMode(env = getServerEnv()): "mock" | "live" {
+  return env.NODE_ENV === "production" ? "live" : env.JOB_PROVIDER_MODE;
 }

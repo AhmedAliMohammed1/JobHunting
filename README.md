@@ -7,7 +7,8 @@ JobHunter AI is a privacy-first job discovery, matching, and application-prepara
 - Next.js 16 App Router, React 19, strict TypeScript, responsive product UI
 - Supabase Auth, Postgres, pgvector, private Storage, migrations, seed data, and RLS
 - Email/password, password recovery, and Google OAuth UI
-- Search-provider abstraction with isolated development fixtures and a delayed/cached Remotive adapter
+- Natural-language search interpretation with deterministic fallback, complete structured filters, and CV-aware match thresholds
+- Search-provider abstraction with isolated development fixtures, an hourly cached Arbeitnow European/UK aggregator, and an optional delayed Remotive adapter
 - Normalization, deduplication, freshness classification, partial-provider failure, retry, and rate limits
 - Deterministic, decomposable job matching with centralized versionable weights
 - AI abstraction for OpenAI-compatible structured output and embeddings, plus explicit mock/not-configured modes
@@ -58,8 +59,8 @@ npm start
 
 ## Production rules
 
-- Set `JOB_PROVIDER_MODE=live`; fixtures are never mixed into live responses.
-- Enable only providers whose current terms and quotas you have reviewed. Remotive public results are labeled delayed/cached and cached for six hours.
+- Production always enforces live-provider mode; fixtures are never mixed into production responses. `JOB_PROVIDER_MODE=mock` remains available for local development and automated tests.
+- Arbeitnow is enabled by default, cached for one hour, attributed on every result, and aggregates listings from multiple public ATS sources. Remotive is opt-in because its public-feed terms and 24-hour delay require a separate deployment review.
 - Keep `FEATURE_AUTO_APPLY=false` until the simulation, adapter, queue, secrets, and monitoring gates in the runbook pass.
 - Never expose `SUPABASE_SECRET_KEY`, worker secrets, AI keys, or cron secrets to `NEXT_PUBLIC_*` variables.
 - Deploy the web application to Vercel and the stateful Playwright worker to a separate container service.

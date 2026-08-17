@@ -12,7 +12,7 @@ export interface AggregatedSearchResult {
 }
 
 function normalized(value: string | undefined): string {
-  return value?.trim().toLowerCase() ?? "";
+  return value?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/[^\p{L}\p{N}+#.]+/gu, " ").replace(/\s+/g, " ").trim() ?? "";
 }
 
 function matchesSearchPhrases(job: NormalizedJob, phrases: string[]): boolean {
@@ -25,9 +25,10 @@ function matchesSearchPhrases(job: NormalizedJob, phrases: string[]): boolean {
     ...job.skills,
   ].filter(Boolean).join(" "));
 
+  const padded = ` ${searchable} `;
   return phrases.some((phrase) => {
     const tokens = normalized(phrase).split(/\s+/).filter(Boolean);
-    return tokens.length > 0 && tokens.every((token) => searchable.includes(token));
+    return tokens.length > 0 && tokens.every((token) => padded.includes(` ${token} `));
   });
 }
 
@@ -36,7 +37,8 @@ function matchesAny(value: string, candidates: string[]): boolean {
 }
 
 export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): boolean {
-  if (!matchesSearchPhrases(job, [...query.roles, ...query.keywords])) return false;
+  if (!matchesSearchPhrases(job, query.roles)) return false;
+  if (!matchesSearchPhrases(job, query.keywords)) return false;
 
   const location = normalized(`${job.location ?? ""} ${job.country ?? ""}`);
   if (!matchesAny(location, query.locations)) return false;
@@ -47,6 +49,7 @@ export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now =
   if (!matchesAny(normalized(job.seniority), query.experienceLevels)) return false;
   if (!matchesAny(normalized(job.company), query.companies)) return false;
   if (query.excludedCompanies.some((company) => normalized(job.company).includes(normalized(company)))) return false;
+  if (query.providers.length && !query.providers.includes(job.provider)) return false;
 
   if (query.postedWithinHours !== undefined) {
     const postedAt = job.postedAt ? Date.parse(job.postedAt) : Number.NaN;
@@ -63,7 +66,7 @@ export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now =
 }
 
 export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearchResult> {
-  const providers = configuredJobProviders();
+  const providers = configuredJobProviders(query);
   const settled = await Promise.allSettled(providers.map(async (provider): Promise<ProviderSearchResult> => {
     const started = Date.now();
     const jobs = await withRetry((signal) => provider.search(query, signal), { attempts: 2 });

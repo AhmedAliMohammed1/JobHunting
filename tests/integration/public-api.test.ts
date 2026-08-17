@@ -20,6 +20,8 @@ describe("public API integration", () => {
     const response = await search(new Request("http://localhost/api/jobs/search", { method: "POST", headers: { "Content-Type": "application/json", "x-forwarded-for": "integration-suite" }, body: JSON.stringify({ query: "TypeScript engineer", filters: { limit: 25 } }) }));
     const body = await response.json();
     expect(response.status).toBe(200); expect(body.jobs.length).toBeGreaterThan(0); expect(body.disclosure).toMatch(/not live listings/i);
+    expect(body.interpretedQuery).toMatchObject({ roles: ["Engineer"], keywords: ["TypeScript"] });
+    expect(body.providers[0]).not.toHaveProperty("jobs");
   });
 
   it("returns a coarse validation error for malformed searches", async () => {

@@ -2,11 +2,35 @@ import { NextResponse } from "next/server";
 import { expandSearchQuery } from "@/src/lib/ai/query-expansion";
 import { getAIProvider } from "@/src/lib/ai/provider";
 import { searchJobs } from "@/src/lib/jobs/search";
+import { interpretSearchQuery, mergeSearchIntent } from "@/src/lib/jobs/query-intent";
+import { rankJobs } from "@/src/lib/matching/rank";
 import { rateLimit } from "@/src/lib/security/rate-limit";
 import { searchRequestSchema, jobSearchSchema } from "@/src/lib/validation/search";
 import { getCurrentUser } from "@/src/lib/auth/user";
 import { createClient } from "@/src/lib/database/supabase/server";
 import { ZodError } from "zod";
+import type { CandidateProfile, CandidateSkill } from "@/src/types/candidate";
+import type { JobSearchQuery, NormalizedJob } from "@/src/types/jobs";
+import type { MatchResult } from "@/src/types/matching";
+
+async function loadCandidateProfile(userId: string): Promise<CandidateProfile | undefined> {
+  const supabase = await createClient();
+  const { data } = await supabase!.from("candidate_profiles")
+    .select("id,full_name,current_title,location,summary,skills,programming_languages,frameworks,tools,certifications,languages,years_experience,preferred_roles,preferred_countries,preferred_locations,employment_types,workplace_types,manual_fields")
+    .eq("user_id", userId).maybeSingle();
+  if (!data) return undefined;
+  return {
+    id: data.id, userId, fullName: data.full_name ?? undefined, currentTitle: data.current_title ?? undefined,
+    location: data.location ?? undefined, summary: data.summary ?? undefined,
+    skills: Array.isArray(data.skills) ? data.skills.filter((skill): skill is CandidateSkill => Boolean(skill && typeof skill === "object" && "name" in skill)) : [],
+    programmingLanguages: data.programming_languages ?? [], frameworks: data.frameworks ?? [], tools: data.tools ?? [],
+    certifications: data.certifications ?? [], languages: data.languages ?? [],
+    yearsExperience: data.years_experience == null ? undefined : Number(data.years_experience),
+    preferredRoles: data.preferred_roles ?? [], preferredCountries: data.preferred_countries ?? [],
+    preferredLocations: data.preferred_locations ?? [], employmentTypes: data.employment_types ?? [],
+    workplaceTypes: data.workplace_types ?? [], manualFields: data.manual_fields ?? [],
+  };
+}
 
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -16,22 +40,43 @@ export async function POST(request: Request) {
   try {
     const startedAt = Date.now();
     const input = searchRequestSchema.parse(await request.json());
-    let expanded = {};
+    const user = await getCurrentUser();
+    const profile = user ? await loadCandidateProfile(user.id) : undefined;
+    const deterministic = input.query ? interpretSearchQuery(input.query, profile?.preferredRoles ?? []) : {};
+    let expanded: Partial<JobSearchQuery> = {};
     if (input.query) {
       try {
-        expanded = await expandSearchQuery(getAIProvider(), input.query, []);
+        expanded = await expandSearchQuery(getAIProvider(), input.query, profile?.preferredRoles ?? []);
       } catch {
-        expanded = { roles: [input.query], keywords: [input.query] };
+        expanded = {};
       }
     }
-    const query = jobSearchSchema.parse({ ...expanded, ...input.filters });
+    const query = jobSearchSchema.parse(mergeSearchIntent(deterministic, expanded, input.filters ?? {}));
     const result = await searchJobs(query);
-    const user = await getCurrentUser();
+    const warnings: string[] = [];
+    let jobs: Array<NormalizedJob & { match?: MatchResult }> = result.jobs;
+    if (profile) {
+      jobs = rankJobs(profile, result.jobs)
+        .filter(({ match }) => query.minimumMatchScore === undefined || match.score >= query.minimumMatchScore)
+        .map(({ job, match }) => ({ ...job, match }));
+    } else if (query.minimumMatchScore !== undefined) {
+      warnings.push("Minimum match requires a completed candidate profile, so that filter was not applied.");
+    }
     if (user) {
       const supabase = await createClient();
-      await supabase?.from("search_history").insert({ user_id: user.id, query, expanded_terms: [...query.roles, ...query.keywords], provider_count: result.providers.length, result_count: result.jobs.length, duration_ms: Date.now() - startedAt });
+      await supabase?.from("search_history").insert({ user_id: user.id, query, expanded_terms: [...query.roles, ...query.keywords], provider_count: result.providers.length, result_count: jobs.length, duration_ms: Date.now() - startedAt });
     }
-    return NextResponse.json({ ...result, disclosure: result.providers.some((p) => p.providerId === "mock") ? "Development fixtures — not live listings." : undefined });
+    const disclosure = result.providers.some((provider) => provider.providerId === "mock")
+      ? "Development fixtures — not live listings."
+      : `${jobs.length} live listing${jobs.length === 1 ? "" : "s"} matched across ${result.providers.length} source${result.providers.length === 1 ? "" : "s"}.`;
+    return NextResponse.json({
+      jobs,
+      providers: result.providers.map(({ health }) => health),
+      partial: result.partial,
+      interpretedQuery: query,
+      warnings,
+      disclosure,
+    });
   } catch (error) {
     return NextResponse.json({ error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed." }, { status: 400 });
   }

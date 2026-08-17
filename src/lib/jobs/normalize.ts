@@ -25,8 +25,21 @@ export function inferSkills(text: string | undefined): string[] {
     "JavaScript", "TypeScript", "React", "Next.js", "Node.js", "Python", "Java",
     "C#", ".NET", "Go", "Rust", "AWS", "Azure", "GCP", "Docker", "Kubernetes",
     "PostgreSQL", "SQL", "GraphQL", "REST", "Terraform", "Figma", "Git",
+    "Machine Learning", "AI", "LLM", "NLP", "PyTorch", "TensorFlow",
   ];
   return known.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text));
+}
+
+export function inferSeniority(...values: Array<string | undefined>): string | undefined {
+  const text = values.filter(Boolean).join(" ").toLowerCase();
+  if (/\b(?:intern|internship)\b/.test(text)) return "Internship";
+  if (/\bworking[ -]?student\b/.test(text)) return "Working student";
+  if (/\b(?:entry[ -]?level|graduate|new grad|junior)\b/.test(text)) return "Junior";
+  if (/\b(?:principal|staff)\b/.test(text)) return /\bprincipal\b/.test(text) ? "Principal" : "Staff";
+  if (/\b(?:lead|head of)\b/.test(text)) return "Lead";
+  if (/\bsenior\b|\bsr\.?\b/.test(text)) return "Senior";
+  if (/\bmid[ -]?level\b/.test(text)) return "Mid level";
+  return undefined;
 }
 
 export function normalizedJob(input: {
@@ -43,6 +56,9 @@ export function normalizedJob(input: {
   salaryText?: string;
   postedAt?: string;
   companyLogo?: string;
+  skills?: string[];
+  seniority?: string;
+  workplaceType?: WorkplaceType;
   sourceDelayHours?: number;
   status?: JobFreshnessStatus;
 }): NormalizedJob {
@@ -57,11 +73,12 @@ export function normalizedJob(input: {
     companyLogo: input.companyLogo,
     location: cleanText(input.location),
     country: cleanText(input.country),
-    workplaceType: inferWorkplaceType(input.location, description),
+    workplaceType: input.workplaceType ?? inferWorkplaceType(input.location, description),
     employmentType: cleanText(input.employmentType),
+    seniority: cleanText(input.seniority) ?? inferSeniority(input.title, description),
     salaryText: cleanText(input.salaryText),
     description,
-    skills: inferSkills(description),
+    skills: [...new Set([...inferSkills(description), ...(input.skills ?? []).map((skill) => cleanText(skill)).filter((skill): skill is string => Boolean(skill))])],
     postedAt: input.postedAt,
     firstDiscoveredAt: now,
     lastSeenAt: now,

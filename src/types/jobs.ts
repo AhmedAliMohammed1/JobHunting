@@ -45,6 +45,7 @@ export interface JobSearchQuery {
   experienceLevels: string[];
   companies: string[];
   excludedCompanies: string[];
+  providers: string[];
   postedWithinHours?: number;
   minimumSalary?: number;
   minimumMatchScore?: number;
@@ -75,4 +76,3 @@ export interface ProviderSearchResult {
   jobs: NormalizedJob[];
   health: ProviderHealth;
 }
-

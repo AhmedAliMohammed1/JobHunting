@@ -28,7 +28,7 @@ const job: NormalizedJob = {
 function query(overrides: Partial<JobSearchQuery> = {}): JobSearchQuery {
   return {
     keywords: [], roles: [], locations: [], countries: [], employmentTypes: [], workplaceTypes: [],
-    experienceLevels: [], companies: [], excludedCompanies: [], limit: 25, ...overrides,
+    experienceLevels: [], companies: [], excludedCompanies: [], providers: [], limit: 25, ...overrides,
   };
 }
 
@@ -38,11 +38,18 @@ describe("job search result filtering", () => {
     expect(jobMatchesQuery(job, query({ roles: ["machine learning"] }), now)).toBe(false);
   });
 
+  it("requires both the role group and the keyword group", () => {
+    expect(jobMatchesQuery(job, query({ roles: ["Engineer"], keywords: ["TypeScript"] }), now)).toBe(true);
+    expect(jobMatchesQuery(job, query({ roles: ["Engineer"], keywords: ["Python"] }), now)).toBe(false);
+  });
+
   it("enforces location, workplace, company, employment, and seniority filters", () => {
     expect(jobMatchesQuery(job, query({ locations: ["Berlin"], countries: ["Germany"], workplaceTypes: ["remote"], companies: ["Northstar"], employmentTypes: ["full"], experienceLevels: ["senior"] }), now)).toBe(true);
     expect(jobMatchesQuery(job, query({ locations: ["Berlin"], countries: ["France"] }), now)).toBe(false);
     expect(jobMatchesQuery(job, query({ workplaceTypes: ["hybrid"] }), now)).toBe(false);
     expect(jobMatchesQuery(job, query({ excludedCompanies: ["northstar"] }), now)).toBe(false);
+    expect(jobMatchesQuery(job, query({ providers: ["fixture"] }), now)).toBe(true);
+    expect(jobMatchesQuery(job, query({ providers: ["arbeitnow"] }), now)).toBe(false);
   });
 
   it("enforces freshness and structured salary thresholds", () => {

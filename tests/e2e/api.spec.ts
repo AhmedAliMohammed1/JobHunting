@@ -21,5 +21,6 @@ test.describe("runtime API suite", () => {
     expect(body.jobs.length).toBeGreaterThan(0);
     expect(body.jobs.every((job: { workplaceType: string }) => job.workplaceType === "remote")).toBe(true);
     expect(body.jobs.some((job: { company: string }) => job.company === "Arc & Field")).toBe(false);
+    expect(body.interpretedQuery).toMatchObject({ roles: ["Engineer"], keywords: ["TypeScript"], workplaceTypes: ["remote"] });
   });
 });

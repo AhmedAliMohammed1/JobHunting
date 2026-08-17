@@ -82,7 +82,7 @@ sequenceDiagram
     API-->>UI: Fresh partial response + provider diagnostics
 ```
 
-Remotive is the first public production adapter. Its public feed is explicitly labeled as delayed by 24 hours and is cached aggressively. The UI must attribute Remotive and link back to its listing. No provider is described as real-time unless its own contract guarantees that behavior.
+Arbeitnow is the default public production adapter and supplies hourly refreshed European and UK listings aggregated from several public ATS sources. Results are cached for one hour, attributed, and linked to the supplied listing. Remotive remains an opt-in remote-only source whose public feed is delayed by 24 hours. No provider is described as real-time unless its own contract guarantees that behavior.
 
 ## Application safety flow
 
@@ -125,4 +125,3 @@ Sensitive facts—work authorization, visa status, legal declarations, demograph
 - Production uses separate Supabase and worker resources, Vercel-managed secrets, verified cron calls, and the global Auto Apply kill switch.
 
 The web application remains useful when AI, email, external providers, or the worker are unavailable. Health checks report only coarse component status and never disclose infrastructure details.
-

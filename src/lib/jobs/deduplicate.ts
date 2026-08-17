@@ -5,12 +5,7 @@ function canonical(value: string | undefined): string {
 }
 
 function key(job: NormalizedJob): string {
-  try {
-    const host = new URL(job.applicationUrl ?? job.sourceUrl).hostname.replace(/^www\./, "");
-    return `${canonical(job.company)}|${canonical(job.title)}|${canonical(job.location)}|${host}`;
-  } catch {
-    return `${canonical(job.company)}|${canonical(job.title)}|${canonical(job.location)}`;
-  }
+  return `${canonical(job.company)}|${canonical(job.title)}|${canonical(job.location)}`;
 }
 
 export function deduplicateJobs(jobs: NormalizedJob[]): NormalizedJob[] {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AIProvider } from "./provider";
+import type { JobSearchQuery } from "@/src/types/jobs";
 
 const querySchema = z.object({
   roles: z.array(z.string()).min(1).max(12),
@@ -20,6 +21,12 @@ export async function expandSearchQuery(provider: AIProvider, query: string, can
     },
   };
   const raw = await provider.generateStructured<unknown>(`Interpret this job search request. Expand roles conservatively using the candidate's target roles.\nTargets: ${candidateRoles.join(", ")}\nRequest: ${query}`, schema, "job_search_query");
-  return querySchema.parse(raw);
+  const parsed = querySchema.parse(raw);
+  return {
+    roles: parsed.roles,
+    countries: parsed.countries,
+    locations: parsed.locations,
+    experienceLevels: parsed.experience,
+    postedWithinHours: parsed.postedWithinHours ?? undefined,
+  } satisfies Partial<JobSearchQuery>;
 }
-

@@ -34,7 +34,7 @@ export async function PUT(request: Request) {
     employment_types: input.employmentTypes,
     workplace_types: input.workplaceTypes,
     years_experience: input.yearsExperience,
-    manual_fields: ["full_name", "current_title", "location", "summary", "skills", "preferences"],
+    manual_fields: ["full_name", "current_title", "location", "summary", "skills", "years_experience", "preferences"],
   }, { onConflict: "user_id" });
   if (error) return NextResponse.json({ error: "Could not save your profile." }, { status: 500 });
   return NextResponse.json({ ok: true });

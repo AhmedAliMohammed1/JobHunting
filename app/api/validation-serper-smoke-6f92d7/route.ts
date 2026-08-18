@@ -1,79 +1,55 @@
+import { getServerEnv } from "@/src/config/env";
+import { detectJobSource, isLikelyJobUrl } from "@/src/lib/jobs/providers/discovery";
+import { createSerperSearchProvider } from "@/src/lib/jobs/providers/serper";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const BASE = "https://job-hunting-two-gamma.vercel.app/api/jobs/search";
-const QUERY = "Software Engineer Germany last 7 days";
-
-type SearchResponse = {
-  jobs?: Array<{ provider?: string; sourceUrl?: string }>;
-  partial?: boolean;
-  providers?: Array<{
-    providerId?: string;
-    ok?: boolean;
-    jobsReturned?: number;
-    errorCode?: string | null;
-  }>;
+type SourceSpec = {
+  label: string;
+  domains: string[];
 };
 
-async function runSearch(provider?: string): Promise<SearchResponse> {
-  const filters: { limit: number; providers?: string[] } = { limit: 50 };
-  if (provider) filters.providers = [provider];
+const SOURCES: Record<string, SourceSpec> = {
+  linkedin: { label: "LinkedIn Jobs", domains: ["linkedin.com", "de.linkedin.com"] },
+  indeed: { label: "Indeed Jobs", domains: ["indeed.com", "de.indeed.com"] },
+  glassdoor: { label: "Glassdoor Jobs", domains: ["glassdoor.com", "glassdoor.de"] },
+};
 
-  const response = await fetch(BASE, {
-    method: "POST",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: QUERY, filters }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`${provider ?? "all"} search returned ${response.status}: ${await response.text()}`);
-  }
-
-  return (await response.json()) as SearchResponse;
-}
-
-function summarize(response: SearchResponse) {
-  const jobs = response.jobs ?? [];
-  return {
-    jobCount: jobs.length,
-    partial: response.partial ?? false,
-    providerHealth: (response.providers ?? []).map(({ providerId, ok, jobsReturned, errorCode }) => ({
-      providerId,
-      ok,
-      jobsReturned,
-      errorCode,
-    })),
-    countsBySource: Object.entries(
-      jobs.reduce<Record<string, number>>((counts, job) => {
-        const source = job.provider ?? "unknown";
-        counts[source] = (counts[source] ?? 0) + 1;
-        return counts;
-      }, {}),
-    ).map(([provider, count]) => ({ provider, count })),
-    sampleUrls: jobs.slice(0, 5).map((job) => job.sourceUrl).filter(Boolean),
-  };
+function sanitize(rows: Awaited<ReturnType<ReturnType<typeof createSerperSearchProvider>["search"]>>) {
+  return rows.map((row) => ({
+    title: row.title,
+    url: row.url,
+    detectedSource: detectJobSource(row.url),
+    likelyJobUrl: isLikelyJobUrl(row.url),
+    content: row.content?.slice(0, 240),
+  }));
 }
 
 export async function GET() {
   try {
-    const all = await runSearch();
-    const linkedin = await runSearch("linkedin");
-    const indeed = await runSearch("indeed");
-    const xing = await runSearch("xing");
-    const stepstone = await runSearch("stepstone");
-    const glassdoor = await runSearch("glassdoor");
+    const env = getServerEnv();
+    if (!env.SERPER_API_KEY) return Response.json({ error: "SERPER_API_KEY is not configured" }, { status: 503 });
+    const serper = createSerperSearchProvider(env.SERPER_API_KEY, 60);
 
-    return Response.json({
-      testedAt: new Date().toISOString(),
-      query: QUERY,
-      all: summarize(all),
-      linkedin: summarize(linkedin),
-      indeed: summarize(indeed),
-      xing: summarize(xing),
-      stepstone: summarize(stepstone),
-      glassdoor: summarize(glassdoor),
-    });
+    const diagnostics: Record<string, unknown> = {};
+    for (const [source, spec] of Object.entries(SOURCES)) {
+      const primary = await serper.search("Software Engineer job opening Germany", {
+        includeDomains: spec.domains,
+        maxResults: 20,
+        searchDepth: "advanced",
+      });
+      const fallback = await serper.search(`${spec.label} Software Engineer Germany`, {
+        maxResults: 20,
+        searchDepth: "advanced",
+      });
+      diagnostics[source] = {
+        primary: sanitize(primary),
+        fallback: sanitize(fallback),
+      };
+    }
+
+    return Response.json({ testedAt: new Date().toISOString(), diagnostics });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown validation error" },

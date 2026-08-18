@@ -49,7 +49,11 @@ describe("major board discovery recall", () => {
     expect(jobs[0].postedAt).toBeTruthy();
   });
 
-  it("retries a board with a source-name recovery query when its domain-filtered search has no valid detail pages", async () => {
+  it.each([
+    ["linkedin", "site:de.linkedin.com/jobs/view", "https://de.linkedin.com/jobs/view/software-engineer-at-example-4455296976"],
+    ["indeed", "site:de.indeed.com/viewjob", "https://de.indeed.com/viewjob?jk=9e2eb651b93dfbe4"],
+    ["glassdoor", "site:glassdoor.de/job-listing", "https://www.glassdoor.de/job-listing/software-engineer-example-JV_KO0,17_KE18,25.htm?jl=1010230646697"],
+  ])("retries %s with a Germany-localized individual job-detail path query", async (source, pathOperator, detailUrl) => {
     const calls: Array<{ query: string; options: Record<string, unknown> }> = [];
     const fake: SearchDiscoveryProvider = {
       id: "fake",
@@ -57,8 +61,8 @@ describe("major board discovery recall", () => {
         calls.push({ query: searchQuery, options: options as unknown as Record<string, unknown> });
         if (calls.length === 1) return [];
         return [{
-          title: "Example hiring Software Engineer in Berlin, Germany | LinkedIn",
-          url: "https://www.linkedin.com/jobs/view/software-engineer-at-example-4455296976",
+          title: "Software Engineer at Example",
+          url: detailUrl,
           content: "1 day ago · Full-time",
           score: 0.8,
         }];
@@ -66,13 +70,15 @@ describe("major board discovery recall", () => {
     };
 
     const provider = createDiscoveryJobProvider(fake);
-    const jobs = await provider.search(query({ providers: ["linkedin"] }));
+    const jobs = await provider.search(query({ providers: [source] }));
 
     expect(calls).toHaveLength(2);
-    expect(calls[1].query).toContain("LinkedIn Jobs");
+    expect(calls[1].query).toContain(pathOperator);
+    expect(calls[1].query).toContain('"Software Engineer"');
     expect(calls[1].options.includeDomains).toBeUndefined();
+    expect(calls[1].options.postedWithinHours).toBe(168);
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].provider).toBe("linkedin");
+    expect(jobs[0].provider).toBe(source);
   });
 
   it("rejects XING search/list pages and keeps individual job-detail URLs", () => {

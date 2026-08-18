@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { JobFreshnessStatus, JobSourceType, NormalizedJob, WorkplaceType } from "@/src/types/jobs";
 import { inferDiscoveryMetadata } from "./discovery-metadata";
+import { canonicalDiscoveryJobUrl } from "./discovery-url";
 
 export function stableJobId(provider: string, externalId: string): string {
   return createHash("sha256").update(`${provider}:${externalId}`).digest("hex").slice(0, 32);
@@ -82,6 +83,9 @@ export function normalizedJob(input: {
   const now = new Date().toISOString();
   const description = cleanText(input.description);
   const sourceType = input.sourceType ?? sourceTypeFor(input.provider);
+
+  // Extract metadata from the original indexed URL first; LinkedIn slugs can carry
+  // company information that is intentionally removed from the final stable URL.
   const discoveryMetadata = sourceType === "search-discovery"
     ? inferDiscoveryMetadata({
       provider: input.provider,
@@ -93,14 +97,22 @@ export function normalizedJob(input: {
       postedAt: input.postedAt,
     })
     : {};
+
+  const stableLink = sourceType === "search-discovery" ? canonicalDiscoveryJobUrl(input.sourceUrl) : undefined;
+  const sourceUrl = stableLink?.url ?? input.sourceUrl;
+  const applicationUrl = sourceType === "search-discovery"
+    ? (canonicalDiscoveryJobUrl(input.applicationUrl ?? input.sourceUrl)?.url ?? sourceUrl)
+    : input.applicationUrl;
+  const externalId = sourceType === "search-discovery" ? (stableLink?.sourceId ?? sourceUrl) : input.externalId;
+
   const location = cleanText(input.location) ?? cleanText(discoveryMetadata.location);
   const country = cleanText(input.country) ?? cleanText(discoveryMetadata.country);
   const company = cleanText(discoveryMetadata.company) ?? cleanText(input.company) ?? "Unknown company";
   const postedAt = input.postedAt ?? discoveryMetadata.postedAt;
 
   return {
-    id: stableJobId(input.provider, input.externalId),
-    externalId: input.externalId,
+    id: stableJobId(input.provider, externalId),
+    externalId,
     provider: input.provider,
     sourceType,
     title: cleanText(input.title) ?? "Untitled role",
@@ -123,8 +135,8 @@ export function normalizedJob(input: {
     firstDiscoveredAt: now,
     lastSeenAt: now,
     lastVerifiedAt: now,
-    applicationUrl: input.applicationUrl,
-    sourceUrl: input.sourceUrl,
+    applicationUrl,
+    sourceUrl,
     status: input.status ?? "LIKELY_ACTIVE",
     freshnessLabel: input.sourceDelayHours ? "cached" : "recently-refreshed",
     sourceDelayHours: input.sourceDelayHours,

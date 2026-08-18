@@ -4,11 +4,18 @@ on:
   push:
     branches:
       - validation/live-production-search
+    paths-ignore:
+      - live-production-search-result.json
+
+permissions:
+  contents: write
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Query production search API
         shell: bash
         run: |
@@ -19,14 +26,28 @@ jobs:
             --data '{"query":"Software Engineer Germany last 7 days","filters":{"limit":50}}' \
             -o response.json
 
-          echo '=== PROVIDER PIPELINES ==='
-          jq '.providers | map({providerId, ok, jobsReturned, errorCode})' response.json
+          jq '{
+            testedAt: (now | todateiso8601),
+            query: "Software Engineer Germany last 7 days",
+            jobCount: (.jobs | length),
+            partial,
+            providers: (.providers | map({providerId, ok, jobsReturned, errorCode})),
+            countsBySource: ([.jobs[].provider] | group_by(.) | map({provider: .[0], count: length})),
+            firstResults: (.jobs[:30] | map({provider, title, company, location, postedAt, sourceUrl})),
+            warnings,
+            disclosure,
+            interpretedQuery
+          }' response.json > live-production-search-result.json
 
-          echo '=== RESULT COUNTS BY SOURCE ==='
-          jq '[.jobs[].provider] | group_by(.) | map({provider: .[0], count: length})' response.json
+          cat live-production-search-result.json
 
-          echo '=== FIRST 30 RESULTS ==='
-          jq '.jobs[:30] | map({provider, title, company, location, postedAt, sourceUrl})' response.json
-
-          echo '=== SUMMARY ==='
-          jq '{jobCount:(.jobs|length), partial, warnings, disclosure, interpretedQuery}' response.json
+      - name: Save validation result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add live-production-search-result.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'test: record live production search result'
+          git push

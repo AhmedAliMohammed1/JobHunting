@@ -37,7 +37,8 @@ function isUnknownCompany(value: string | undefined): boolean {
 function cleanCompany(value: string | undefined): string | undefined {
   const company = decode(value)
     .replace(/\s*\(gehört zu [^)]+\)\s*$/i, "")
-    .replace(/^[\s.,;:·•|-]+|[\s.,;:·•|-]+$/g, "")
+    .replace(/^[\s.,;:·•|-]+/, "")
+    .replace(/[\s,;:·•|-]+$/, "")
     .trim();
   if (!company || company.length > 100) return undefined;
   if (/^(?:join|apply|review|find|browse|search|full job|job details|stellenbeschreibung|software engineer|developer|engineer|we\b|who\b)/i.test(company)) return undefined;
@@ -114,15 +115,21 @@ function linkedinMetadata(title: string, description: string, sourceUrl?: string
   };
 }
 
+function stripLeadingCandidate(description: string, candidate: string): string | undefined {
+  if (!candidate || !description.toLowerCase().startsWith(candidate.toLowerCase())) return undefined;
+  return description.slice(candidate.length).replace(/^[\s.:;|·•-]+/, "").trim();
+}
+
 function removeLeadingTitle(description: string, title: string): string {
   const clean = cleanTitle(title);
   if (!clean) return description;
-  const normalizedDescription = description.toLowerCase();
-  const normalizedTitle = clean.toLowerCase();
-  if (normalizedDescription.startsWith(normalizedTitle)) {
-    return description.slice(clean.length).replace(/^[\s.:;|·•-]+/, "").trim();
-  }
-  return description;
+
+  const exact = stripLeadingCandidate(description, clean);
+  if (exact !== undefined) return exact;
+
+  const withoutTrailingLocation = clean.replace(/\s+-\s+[^|]+$/, "").trim();
+  const shortened = stripLeadingCandidate(description, withoutTrailingLocation);
+  return shortened ?? description;
 }
 
 function indeedMetadata(title: string, description: string): Pick<DiscoveryMetadata, "company" | "location"> {

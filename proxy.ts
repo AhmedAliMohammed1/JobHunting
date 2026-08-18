@@ -15,6 +15,8 @@ const protectedPrefixes = [
   "/settings",
 ];
 
+const signedOutOnlyPaths = new Set(["/login", "/register", "/forgot-password"]);
+
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -42,7 +44,16 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getClaims();
-  if (needsAuth && !data?.claims?.sub) {
+  const userId = data?.claims?.sub;
+
+  if (userId && signedOutOnlyPaths.has(request.nextUrl.pathname)) {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/dashboard";
+    dashboardUrl.search = "";
+    return NextResponse.redirect(dashboardUrl);
+  }
+
+  if (needsAuth && !userId) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("returnTo", request.nextUrl.pathname);

@@ -43,7 +43,7 @@ export function createAdzunaProvider(config: { appId: string; appKey: string; co
     name: "Adzuna official jobs API",
     sourceType: "official-api",
     async search(query, signal) {
-      const what = [...query.roles, ...query.keywords].slice(0, 5).join(" ");
+      const what = [query.roles[0], ...query.keywords].filter(Boolean).slice(0, 4).join(" ");
       const where = query.locations[0];
       const countries = selectedCountries(query, config.countries);
       const responses = await Promise.all(countries.map(async (country) => {

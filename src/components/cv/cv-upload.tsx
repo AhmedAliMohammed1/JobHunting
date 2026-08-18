@@ -31,6 +31,9 @@ export function CvUpload() {
 
   async function processDocument(id: string) {
     setProcessingId(id);
+    setDocuments((current) => current.map((document) => document.id === id
+      ? { ...document, parse_status: "PROCESSING", parse_error: null }
+      : document));
     try {
       setMessage("Extracting text from your CV…");
       const parseResponse = await fetch(`/api/cv/${id}/process`, { method: "POST", cache: "no-store" });
@@ -97,7 +100,7 @@ export function CvUpload() {
         <div>
           <span className="source-label">{document.parse_status} · {(document.size_bytes / 1024).toFixed(1)} KB</span>
           <h2>{document.original_filename}</h2>
-          <p>{document.parse_error ? document.parse_error : document.parsed_at ? `Processed ${new Date(document.parsed_at).toLocaleString()}` : `Uploaded ${new Date(document.created_at).toLocaleString()}`}</p>
+          <p>{isProcessing ? "Processing CV and building your AI profile…" : document.parse_error ? document.parse_error : document.parsed_at ? `Processed ${new Date(document.parsed_at).toLocaleString()}` : `Uploaded ${new Date(document.created_at).toLocaleString()}`}</p>
         </div>
         <button className="icon-button" type="button" aria-label={`Process ${document.original_filename}`} title={document.parse_status === "COMPLETE" ? "Refresh profile from CV" : "Process CV"} disabled={isProcessing || Boolean(processingId && processingId !== document.id)} onClick={() => processDocument(document.id)}><RefreshCw className={isProcessing ? "spin" : undefined} size={16} /></button>
         <button className="icon-button" type="button" aria-label={`Delete ${document.original_filename}`} onClick={() => remove(document.id)} disabled={isProcessing || Boolean(processingId)}><Trash2 size={16} /></button>

@@ -91,12 +91,12 @@ export class OpenAICompatibleProvider implements AIProvider {
         if (response.ok) return payload;
 
         const error = new Error(payload.error?.message ?? `AI provider returned ${response.status}.`);
-        const retryableStatus = [408, 429, 502, 503].includes(response.status);
+        const retryableStatus = [408, 429, 500, 502, 503, 504].includes(response.status);
         if (!retryableStatus || attempt >= retries) throw error;
 
         const retryAfter = Number(response.headers.get("Retry-After"));
         const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? Math.min(retryAfter * 1000, 5_000)
+          ? Math.min(retryAfter * 1000, 10_000)
           : 750;
         await sleep(delayMs);
       } catch (error) {
@@ -121,17 +121,27 @@ export class OpenAICompatibleProvider implements AIProvider {
 
   private structuredModel() {
     // The generic free router can randomly select high-latency reasoning models.
-    // Pin structured extraction to a currently free model that explicitly supports
-    // structured_outputs. Explicitly configured model IDs are always respected.
+    // Pin structured extraction to a free model that supports structured outputs.
+    // Explicitly configured model IDs are always respected.
     if (this.isOpenRouter() && this.configuration.model === "openrouter/free") {
       return "google/gemma-4-26b-a4b-it:free";
     }
     return this.configuration.model;
   }
 
+  private structuredFallbackModels(primaryModel: string) {
+    if (!this.isOpenRouter()) return [];
+    const configuredModel = this.configuration.model;
+    const isFreeConfiguration = configuredModel === "openrouter/free" || configuredModel.endsWith(":free");
+    if (!isFreeConfiguration || primaryModel === "openrouter/free") return [];
+    return ["openrouter/free"];
+  }
+
   async generateStructured<T>(prompt: string, schema: unknown, schemaName = "jobhunter_result"): Promise<T> {
+    const primaryModel = this.structuredModel();
+    const fallbackModels = this.structuredFallbackModels(primaryModel);
     const requestBody: Record<string, unknown> = {
-      model: this.structuredModel(),
+      model: primaryModel,
       messages: [
         { role: "system", content: "Return only truthful information supported by the supplied context. Never invent unsupported facts. Use null where the schema permits unknown scalar values and empty arrays for unknown list values." },
         { role: "user", content: prompt },
@@ -144,10 +154,13 @@ export class OpenAICompatibleProvider implements AIProvider {
       max_tokens: 2_500,
     };
 
+    if (fallbackModels.length) requestBody.models = fallbackModels;
+
     if (this.isOpenRouter()) {
       requestBody.provider = {
         require_parameters: true,
         allow_fallbacks: true,
+        sort: "latency",
       };
     }
 

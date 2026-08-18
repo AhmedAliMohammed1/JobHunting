@@ -27,15 +27,27 @@ describe("AI provider adapters", () => {
     expect(JSON.parse(String(options.body)).response_format.json_schema.strict).toBe(true);
   });
 
-  it("requires OpenRouter routes that support requested structured-output parameters", async () => {
+  it("uses OpenRouter structured-output routing with a free model fallback", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"ok\":true}" } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/free", embeddingModel: "embed" });
     await provider.generateStructured("prompt", { type: "object" }, "result");
     const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(options.body));
-    expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.model).toBe("google/gemma-4-26b-a4b-it:free");
+    expect(body.models).toEqual(["openrouter/free"]);
+    expect(body.provider).toEqual({ require_parameters: true, allow_fallbacks: true, sort: "latency" });
     expect(body.response_format.type).toBe("json_schema");
+  });
+
+  it("retries transient OpenRouter provider failures", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Provider returned error" } }), { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"ok\":true}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/free", embeddingModel: "embed" });
+    await expect(provider.generateStructured("prompt", { type: "object" }, "result")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces provider errors and missing response data", async () => {

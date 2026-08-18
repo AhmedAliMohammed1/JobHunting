@@ -57,6 +57,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
         router.replace(safeReturnPath(searchParams.get("returnTo")));
         router.refresh();
       } else if (mode === "register") {
+        const existing = await supabase.auth.getSession();
+        if (existing.error) throw existing.error;
+        if (existing.data.session) {
+          const signedOut = await supabase.auth.signOut();
+          if (signedOut.error) throw signedOut.error;
+        }
         const result = await supabase.auth.signUp({
           email,
           password,

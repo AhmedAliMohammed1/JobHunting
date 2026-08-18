@@ -36,12 +36,34 @@ export function CvUpload() {
       setMessage("CV parsing is not configured in this environment.");
       return;
     }
+
     setProcessingId(id);
-    setMessage("Extracting text from your CV…");
-    const { error } = await supabase.functions.invoke("parse-cv", { body: { documentId: id } });
-    await load();
-    setProcessingId(undefined);
-    setMessage(error ? "CV parsing failed. See the document error below and try again after correcting the file." : "CV text extracted successfully. The document is ready for profile extraction.");
+    try {
+      setMessage("Extracting text from your CV…");
+      const { error: parseError } = await supabase.functions.invoke("parse-cv", { body: { documentId: id } });
+      if (parseError) {
+        await load();
+        setMessage("CV text extraction failed. See the document error below and try again.");
+        return;
+      }
+
+      setMessage("CV text extracted. Building your AI profile…");
+      const profileResponse = await fetch(`/api/cv/${id}/profile`, { method: "POST", cache: "no-store" });
+      const profileBody = await profileResponse.json() as { error?: string };
+      await load();
+
+      if (!profileResponse.ok) {
+        setMessage(profileBody.error ?? "AI profile extraction failed. You can process the CV again.");
+        return;
+      }
+
+      setMessage("CV processed successfully. Your profile now uses the AI-extracted CV facts while preserving your manual edits.");
+    } catch {
+      await load();
+      setMessage("CV processing was interrupted. Try processing this CV again.");
+    } finally {
+      setProcessingId(undefined);
+    }
   }
 
   async function upload(formData: FormData) {
@@ -70,22 +92,21 @@ export function CvUpload() {
       <h2>Add a CV version</h2>
       <p role="status">{message}</p>
       <input name="file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required />
-      <button type="submit">Upload securely</button>
+      <button type="submit" disabled={Boolean(processingId)}>Upload securely</button>
       <small><LockKeyhole size={14} /> Never public. Access is user-scoped by row and storage policies.</small>
     </form>
 
     {documents.length ? <div className="application-list">{documents.map((document) => {
       const isProcessing = processingId === document.id || document.parse_status === "PROCESSING";
-      const canRetry = document.parse_status === "PENDING" || document.parse_status === "FAILED";
       return <article className="result-card" key={document.id}>
         <FileText />
         <div>
           <span className="source-label">{document.parse_status} · {(document.size_bytes / 1024).toFixed(1)} KB</span>
           <h2>{document.original_filename}</h2>
-          <p>{document.parse_error ? document.parse_error : document.parsed_at ? `Parsed ${new Date(document.parsed_at).toLocaleString()}` : `Uploaded ${new Date(document.created_at).toLocaleString()}`}</p>
+          <p>{document.parse_error ? document.parse_error : document.parsed_at ? `Processed ${new Date(document.parsed_at).toLocaleString()}` : `Uploaded ${new Date(document.created_at).toLocaleString()}`}</p>
         </div>
-        {canRetry ? <button className="icon-button" type="button" aria-label={`Process ${document.original_filename}`} title="Process CV" disabled={isProcessing} onClick={() => processDocument(document.id)}><RefreshCw className={isProcessing ? "spin" : undefined} size={16} /></button> : null}
-        <button className="icon-button" type="button" aria-label={`Delete ${document.original_filename}`} onClick={() => remove(document.id)} disabled={isProcessing}><Trash2 size={16} /></button>
+        <button className="icon-button" type="button" aria-label={`Process ${document.original_filename}`} title={document.parse_status === "COMPLETE" ? "Refresh profile from CV" : "Process CV"} disabled={isProcessing || Boolean(processingId && processingId !== document.id)} onClick={() => processDocument(document.id)}><RefreshCw className={isProcessing ? "spin" : undefined} size={16} /></button>
+        <button className="icon-button" type="button" aria-label={`Delete ${document.original_filename}`} onClick={() => remove(document.id)} disabled={isProcessing || Boolean(processingId)}><Trash2 size={16} /></button>
       </article>;
     })}</div> : null}
   </div>;

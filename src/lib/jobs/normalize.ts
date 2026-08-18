@@ -28,6 +28,58 @@ export function inferWorkplaceType(...values: Array<string | undefined>): Workpl
   return "unknown";
 }
 
+const US_STATE_CODES = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+]);
+
+const GERMANY_LOCATION_HINTS = [
+  "berlin", "munich", "münchen", "hamburg", "bremen", "hannover", "frankfurt", "stuttgart", "cologne", "köln",
+  "düsseldorf", "dortmund", "essen", "leipzig", "dresden", "nuremberg", "nürnberg", "erlangen", "ingolstadt",
+  "darmstadt", "ulm", "aachen", "karlsruhe", "regensburg", "potsdam", "mannheim", "heidelberg", "wolfsburg",
+  "braunschweig", "saarbrücken", "jena", "bielefeld", "bochum", "bonn", "würzburg", "mainz", "wiesbaden",
+  "freiburg", "rellingen", "hohenfels", "bavaria", "bayern", "hesse", "hessen", "saxony", "sachsen",
+  "lower saxony", "niedersachsen", "north rhine westphalia", "nordrhein westfalen", "nrw", "baden württemberg",
+  "thuringia", "thüringen", "schleswig holstein", "saxony anhalt", "sachsen anhalt", "brandenburg", "saarland",
+  "mecklenburg vorpommern",
+];
+
+function inferCountryFromLocation(value: string | undefined): string | undefined {
+  const location = cleanText(value);
+  if (!location) return undefined;
+  const lower = location.toLowerCase();
+
+  if (/\b(?:germany|deutschland)\b/i.test(location) || GERMANY_LOCATION_HINTS.some((hint) => lower.includes(hint))) return "Germany";
+  if (/\b(?:egypt|ägypten)\b/i.test(location)) return "Egypt";
+  if (/\b(?:united states|u\.s\.|u\.s\.a\.|usa)\b/i.test(location)) return "United States";
+  if (/\b(?:united kingdom|great britain|england|scotland|wales)\b/i.test(location)) return "United Kingdom";
+  if (/\b(?:switzerland|schweiz|suisse|svizzera)\b/i.test(location)) return "Switzerland";
+  if (/\b(?:austria|österreich)\b/i.test(location)) return "Austria";
+  if (/\b(?:france|frankreich)\b/i.test(location)) return "France";
+  if (/\b(?:netherlands|niederlande|holland)\b/i.test(location)) return "Netherlands";
+  if (/\b(?:belgium|belgien)\b/i.test(location)) return "Belgium";
+  if (/\b(?:poland|polen)\b/i.test(location)) return "Poland";
+  if (/\b(?:czechia|czech republic|tschechien)\b/i.test(location)) return "Czechia";
+  if (/\b(?:denmark|dänemark)\b/i.test(location)) return "Denmark";
+  if (/\b(?:sweden|schweden)\b/i.test(location)) return "Sweden";
+  if (/\b(?:norway|norwegen)\b/i.test(location)) return "Norway";
+  if (/\b(?:finland|finnland)\b/i.test(location)) return "Finland";
+  if (/\b(?:italy|italien)\b/i.test(location)) return "Italy";
+  if (/\b(?:spain|spanien)\b/i.test(location)) return "Spain";
+  if (/\bportugal\b/i.test(location)) return "Portugal";
+  if (/\b(?:ireland|irland)\b/i.test(location)) return "Ireland";
+  if (/\bcanada\b/i.test(location)) return "Canada";
+  if (/\bindia\b/i.test(location)) return "India";
+
+  const segments = location.split(",").map((segment) => segment.trim()).filter(Boolean);
+  const last = segments.at(-1)?.toUpperCase();
+  if (last === "US" || last === "USA") return "United States";
+  if (last === "UK" || last === "GB") return "United Kingdom";
+  if (last === "EG") return "Egypt";
+  if (last && US_STATE_CODES.has(last)) return "United States";
+
+  return undefined;
+}
+
 function containsKnownSkill(text: string, skill: string): boolean {
   const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(text);
@@ -124,7 +176,10 @@ export function normalizedJob(input: {
   const externalId = sourceType === "search-discovery" ? (stableLink?.sourceId ?? sourceUrl) : input.externalId;
 
   const location = cleanText(input.location) ?? cleanText(discoveryMetadata.location);
-  const country = cleanText(input.country) ?? cleanText(discoveryMetadata.country);
+  const country = cleanText(input.country)
+    ?? cleanText(discoveryMetadata.country)
+    ?? inferCountryFromLocation(location)
+    ?? (sourceType === "search-discovery" ? "Unknown" : undefined);
   const company = cleanText(discoveryMetadata.company) ?? cleanText(input.company) ?? "Unknown company";
   const postedAt = input.postedAt ?? discoveryMetadata.postedAt;
   const seniority = cleanText(input.seniority)

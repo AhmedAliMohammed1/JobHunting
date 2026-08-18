@@ -118,4 +118,48 @@ describe("search-discovery metadata enrichment", () => {
     expect(explicit.location).toBe("Munich, Germany");
     expect(explicit.postedAt).toBe("2026-08-18T01:00:00.000Z");
   });
+
+  it("infers United States from major-board city/state/US locations", () => {
+    const usJob = normalizedJob({
+      provider: "linkedin",
+      sourceType: "search-discovery",
+      externalId: "linkedin-us",
+      title: "Embedded Software Engineer",
+      company: "Fab2",
+      location: "Austin, TX, US",
+      postedAt: "2026-08-17T02:00:00.000Z",
+      sourceUrl: "https://www.linkedin.com/jobs/view/embedded-software-engineer-at-fab2-4455296976",
+    });
+
+    expect(usJob.country).toBe("United States");
+  });
+
+  it("infers Germany from a German city-only discovery location", () => {
+    const germanyJob = normalizedJob({
+      provider: "xing",
+      sourceType: "search-discovery",
+      externalId: "xing-de",
+      title: "Embedded Softwareentwickler C++",
+      company: "Example GmbH",
+      location: "Rellingen",
+      postedAt: "2026-08-17T02:00:00.000Z",
+      sourceUrl: "https://www.xing.com/jobs/rellingen-embedded-softwareentwickler-156898902",
+    });
+
+    expect(germanyJob.country).toBe("Germany");
+  });
+
+  it("marks discovery rows with no verifiable country as Unknown so country filters can reject them", () => {
+    const unknown = normalizedJob({
+      provider: "career-page",
+      sourceType: "search-discovery",
+      externalId: "career-unknown",
+      title: "Staff Embedded Software Engineer",
+      company: "Example Motor Company",
+      postedAt: "2026-08-17T02:00:00.000Z",
+      sourceUrl: "https://example.com/careers/jobs/123",
+    });
+
+    expect(unknown.country).toBe("Unknown");
+  });
 });

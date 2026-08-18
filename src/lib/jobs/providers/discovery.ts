@@ -191,13 +191,27 @@ function buildNaturalSearchQuery(input: DiscoveryQueryInput): string {
   return [primaryRole || "job", "job opening", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
 }
 
+function isGermanSearch(input: DiscoveryQueryInput): boolean {
+  const values = [...input.locations, ...input.countries].map((value) => value.trim().toLowerCase());
+  return values.some((value) => value === "de" || value.includes("germany") || value.includes("deutschland"));
+}
+
+function detailPageOperator(source: DiscoverySourceId, input: DiscoveryQueryInput): string | undefined {
+  const german = isGermanSearch(input);
+  if (source === "linkedin") return german ? "site:de.linkedin.com/jobs/view" : "site:linkedin.com/jobs/view";
+  if (source === "indeed") return german ? "site:de.indeed.com/viewjob" : "site:indeed.com/viewjob";
+  if (source === "glassdoor") return german ? "site:glassdoor.de/job-listing" : "site:glassdoor.com/job-listing";
+  return undefined;
+}
+
 function buildSourceFallbackQuery(source: DiscoverySourceId, input: DiscoveryQueryInput): string {
-  const label = SOURCE_SEARCH_LABELS[source] ?? source;
-  const primaryRole = [input.roles[0], ...input.keywords].filter(Boolean).slice(0, 4).join(" ");
+  const target = detailPageOperator(source, input) ?? SOURCE_SEARCH_LABELS[source] ?? source;
+  const primaryRole = input.roles[0] ? `"${input.roles[0].replace(/"/g, "")}"` : (input.keywords[0] ?? "job");
+  const keywords = input.keywords.slice(0, 3).join(" ");
   const locations = [...input.locations, ...input.countries].filter(Boolean).slice(0, 4).join(" ");
   const employment = employmentTerms(input.employmentTypes).slice(0, 3).join(" ");
   const workplaces = input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type).join(" ");
-  return [label, primaryRole || "job", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
+  return [target, primaryRole, keywords, locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
 }
 
 export function detectATS(url: string): DiscoverySourceId | undefined {
@@ -371,7 +385,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
         let validRows = primaryRows.filter((result) => validDiscoveryResult(result, group.source));
         if (!validRows.length && group.source && FALLBACK_DISCOVERY_SOURCES.has(group.source)) {
           const fallbackRows = await searchProvider.search(buildSourceFallbackQuery(group.source, input), {
-            postedWithinHours: group.source === "xing" ? query.postedWithinHours : undefined,
+            postedWithinHours: query.postedWithinHours,
             maxResults: 12,
             searchDepth: advanced ? "advanced" : "basic",
           }, signal);

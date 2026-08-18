@@ -7,11 +7,20 @@ import { Buffer } from "node:buffer";
 const PDF = "application/pdf";
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_EXTRACTED_CHARS = 120_000;
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -21,6 +30,9 @@ function safeMessage(error: unknown) {
 }
 
 Deno.serve(async (request: Request) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
   const authorization = request.headers.get("Authorization") ?? "";

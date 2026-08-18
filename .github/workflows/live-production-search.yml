@@ -6,6 +6,7 @@ on:
       - validation/live-production-search
     paths-ignore:
       - live-production-search-result.json
+      - live-production-search-summary.json
 
 permissions:
   contents: write
@@ -57,23 +58,23 @@ jobs:
             '{
               testedAt: (now | todateiso8601),
               query: "Software Engineer Germany last 7 days",
-              all: ($all[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), countsBySource:([.jobs[].provider]|group_by(.)|map({provider:.[0],count:length})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
-              linkedin: ($linkedin[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
-              indeed: ($indeed[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
-              xing: ($xing[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
-              stepstone: ($stepstone[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
-              glassdoor: ($glassdoor[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))})
-            }' > live-production-search-result.json
+              all: ($all[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), countsBySource:([.jobs[].provider]|group_by(.)|map({provider:.[0],count:length}))}),
+              linkedin: ($linkedin[0] | {jobCount:(.jobs|length), partial, providerHealth:(.providers|map({providerId,ok,jobsReturned,errorCode})), sampleUrls:(.jobs[:3]|map(.sourceUrl))}),
+              indeed: ($indeed[0] | {jobCount:(.jobs|length), partial, providerHealth:(.providers|map({providerId,ok,jobsReturned,errorCode})), sampleUrls:(.jobs[:3]|map(.sourceUrl))}),
+              xing: ($xing[0] | {jobCount:(.jobs|length), partial, providerHealth:(.providers|map({providerId,ok,jobsReturned,errorCode})), sampleUrls:(.jobs[:3]|map(.sourceUrl))}),
+              stepstone: ($stepstone[0] | {jobCount:(.jobs|length), partial, providerHealth:(.providers|map({providerId,ok,jobsReturned,errorCode})), sampleUrls:(.jobs[:3]|map(.sourceUrl))}),
+              glassdoor: ($glassdoor[0] | {jobCount:(.jobs|length), partial, providerHealth:(.providers|map({providerId,ok,jobsReturned,errorCode})), sampleUrls:(.jobs[:3]|map(.sourceUrl))})
+            }' > live-production-search-summary.json
 
-          cat live-production-search-result.json
+          cat live-production-search-summary.json
 
-      - name: Save validation result
+      - name: Save validation summary
         shell: bash
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add live-production-search-result.json
+          git add live-production-search-summary.json
           git diff --cached --quiet && exit 0
-          git commit -m 'test: record live production source probes'
+          git commit -m 'test: record compact production source summary'
           git push

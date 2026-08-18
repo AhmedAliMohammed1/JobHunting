@@ -1,0 +1,32 @@
+name: Live production job search smoke
+
+on:
+  push:
+    branches:
+      - validation/live-production-search
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query production search API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST 'https://job-hunting-two-gamma.vercel.app/api/jobs/search' \
+            -H 'content-type: application/json' \
+            --data '{"query":"Software Engineer Germany last 7 days","filters":{"limit":50}}' \
+            -o response.json
+
+          echo '=== PROVIDER PIPELINES ==='
+          jq '.providers | map({providerId, ok, jobsReturned, errorCode})' response.json
+
+          echo '=== RESULT COUNTS BY SOURCE ==='
+          jq '[.jobs[].provider] | group_by(.) | map({provider: .[0], count: length})' response.json
+
+          echo '=== FIRST 30 RESULTS ==='
+          jq '.jobs[:30] | map({provider, title, company, location, postedAt, sourceUrl})' response.json
+
+          echo '=== SUMMARY ==='
+          jq '{jobCount:(.jobs|length), partial, warnings, disclosure, interpretedQuery}' response.json

@@ -12,6 +12,7 @@ import { jobMatchesQuery, searchJobs } from "@/src/lib/jobs/search";
 import { SEARCH_ENGINE_VERSION } from "@/src/lib/jobs/search-engine-version";
 import { interpretSearchQuery, mergeSearchIntent } from "@/src/lib/jobs/query-intent";
 import { rankJobs } from "@/src/lib/matching/rank";
+import { log } from "@/src/lib/observability/logger";
 import { rateLimit } from "@/src/lib/security/rate-limit";
 import { searchRequestSchema, jobSearchSchema } from "@/src/lib/validation/search";
 import { getCurrentUser } from "@/src/lib/auth/user";
@@ -31,10 +32,33 @@ type SearchJob = NormalizedJob & {
   aiAssessment?: LLMJobAssessment;
 };
 
+type LLMFailureCode = "rate_limit" | "timeout" | "structured_output" | "provider_routing" | "network" | "unknown";
+
 const privateHeaders = {
   "Cache-Control": "private, no-store, max-age=0",
   "X-Search-Engine-Version": SEARCH_ENGINE_VERSION,
 };
+
+function llmFailureCode(error: unknown): LLMFailureCode {
+  const message = error instanceof Error ? `${error.name} ${error.message}`.toLowerCase() : "";
+  if (/429|rate limit|quota|capacity/.test(message)) return "rate_limit";
+  if (/timeout|abort/.test(message)) return "timeout";
+  if (/json|schema|structured|parse/.test(message)) return "structured_output";
+  if (/provider|model|route|routing|support/.test(message)) return "provider_routing";
+  if (/fetch|network|socket|connection/.test(message)) return "network";
+  return "unknown";
+}
+
+function failureMessage(code: LLMFailureCode | undefined): string {
+  switch (code) {
+    case "rate_limit": return "free-model capacity or rate limiting";
+    case "timeout": return "an AI timeout";
+    case "structured_output": return "a structured-output validation problem";
+    case "provider_routing": return "temporary AI provider routing";
+    case "network": return "a temporary AI network problem";
+    default: return "a temporary AI provider problem";
+  }
+}
 
 async function loadCandidateProfile(userId: string): Promise<CandidateProfile | undefined> {
   const supabase = await createClient();
@@ -129,10 +153,20 @@ export async function POST(request: Request) {
     const strictQuery = hardFilterQuery(baseQuery);
     const provider = getAIProvider();
     const warnings: string[] = [];
+    let plannerFailure: LLMFailureCode | undefined;
+    let retrievalFailure: LLMFailureCode | undefined;
+    let assessmentFailure: LLMFailureCode | undefined;
 
     const normalPromise = searchJobs(baseQuery);
     const planPromise: Promise<LLMSearchPlan | undefined> = input.query && provider.id !== "not-configured"
-      ? createLLMSearchPlan(provider, input.query, baseQuery, profile).catch(() => undefined)
+      ? createLLMSearchPlan(provider, input.query, baseQuery, profile).catch((error) => {
+          plannerFailure = llmFailureCode(error);
+          log("warn", "llm_search_plan_failed", {
+            category: plannerFailure,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          });
+          return undefined;
+        })
       : Promise.resolve(undefined);
 
     const [normalResult, plan] = await Promise.all([normalPromise, planPromise]);
@@ -143,11 +177,16 @@ export async function POST(request: Request) {
       llmQuery = jobSearchSchema.parse(buildLLMSearchQuery(baseQuery, plan));
       try {
         llmResult = await searchJobs(llmQuery);
-      } catch {
+      } catch (error) {
+        retrievalFailure = llmFailureCode(error);
+        log("warn", "llm_search_retrieval_failed", {
+          category: retrievalFailure,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
         warnings.push("The LLM-expanded retrieval pass was unavailable, so normal search results are shown.");
       }
     } else if (input.query) {
-      warnings.push("The LLM search planner was unavailable for this request; normal search still completed.");
+      warnings.push(`The LLM search planner was unavailable because of ${failureMessage(plannerFailure)}; normal search still completed.`);
     }
 
     const normalJobs = normalResult.jobs.filter((job) => jobMatchesQuery(job, baseQuery));
@@ -160,7 +199,12 @@ export async function POST(request: Request) {
     if (plan && assessmentCandidates.length) {
       try {
         aiAssessments = await assessJobsWithLLM(provider, input.query ?? baseQuery.roles.join(" "), plan, assessmentCandidates, profile);
-      } catch {
+      } catch (error) {
+        assessmentFailure = llmFailureCode(error);
+        log("warn", "llm_job_assessment_failed", {
+          category: assessmentFailure,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
         warnings.push("LLM semantic reranking timed out or was unavailable; deterministic CV scoring was kept.");
       }
     }
@@ -230,7 +274,15 @@ export async function POST(request: Request) {
       sourceBreakdown: finalBreakdown,
       searchModes: {
         normal: { count: normalJobs.length, sourceBreakdown: normalBreakdown },
-        llm: { count: llmJobs.length, sourceBreakdown: llmBreakdown, available: Boolean(plan && llmResult) },
+        llm: {
+          count: llmJobs.length,
+          sourceBreakdown: llmBreakdown,
+          available: Boolean(plan && llmResult),
+          planner: plan ? "ready" : "unavailable",
+          plannerFailure,
+          retrievalFailure,
+          assessmentFailure,
+        },
         overlap,
         combined: jobs.length,
       },

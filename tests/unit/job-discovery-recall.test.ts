@@ -43,9 +43,36 @@ describe("major board discovery recall", () => {
     expect(calls[0].options.searchDepth).toBe("advanced");
     expect(calls[0].options.postedWithinHours).toBeUndefined();
     expect(calls[0].options.includeDomains).toEqual(expect.arrayContaining(["linkedin.com", "de.linkedin.com"]));
-    expect(calls[0].query).toContain("last 7 days");
+    expect(calls[0].query).toContain("Software Engineer");
+    expect(calls[0].query).toContain("Germany");
     expect(jobs[0]).toMatchObject({ provider: "linkedin", company: "Contabo", title: "Software Engineer (all genders)", location: "Deutschland" });
     expect(jobs[0].postedAt).toBeTruthy();
+  });
+
+  it("retries a board with a source-name recovery query when its domain-filtered search has no valid detail pages", async () => {
+    const calls: Array<{ query: string; options: Record<string, unknown> }> = [];
+    const fake: SearchDiscoveryProvider = {
+      id: "fake",
+      async search(searchQuery, options) {
+        calls.push({ query: searchQuery, options: options as unknown as Record<string, unknown> });
+        if (calls.length === 1) return [];
+        return [{
+          title: "Example hiring Software Engineer in Berlin, Germany | LinkedIn",
+          url: "https://www.linkedin.com/jobs/view/software-engineer-at-example-4455296976",
+          content: "1 day ago · Full-time",
+          score: 0.8,
+        }];
+      },
+    };
+
+    const provider = createDiscoveryJobProvider(fake);
+    const jobs = await provider.search(query({ providers: ["linkedin"] }));
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1].query).toContain("LinkedIn Jobs");
+    expect(calls[1].options.includeDomains).toBeUndefined();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].provider).toBe("linkedin");
   });
 
   it("rejects XING search/list pages and keeps individual job-detail URLs", () => {

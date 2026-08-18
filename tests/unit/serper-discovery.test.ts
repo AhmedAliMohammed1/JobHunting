@@ -4,7 +4,7 @@ import { createSerperSearchProvider } from "@/src/lib/jobs/providers/serper";
 describe("Serper discovery adapter", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("uses server-side auth, Google site operators, country, language and recency without treating rank as relevance", async () => {
+  it("uses server-side auth, Google site operators, country, language and recency while capping results at ten", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     fetchMock.mockResolvedValue(new Response(JSON.stringify({
       organic: [{
@@ -35,7 +35,7 @@ describe("Serper discovery adapter", () => {
     expect(body.gl).toBe("de");
     expect(body.hl).toBe("en");
     expect(body.tbs).toBe("qdr:w");
-    expect(body.num).toBe(20);
+    expect(body.num).toBe(10);
     expect(results).toHaveLength(1);
     expect(results[0].url).toContain("linkedin.com/jobs/view");
     expect(results[0].content).toContain("2 days ago");

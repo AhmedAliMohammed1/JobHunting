@@ -1,14 +1,14 @@
 {
-  "testedAt": "2026-08-18T00:31:32Z",
+  "testedAt": "2026-08-18T03:04:30Z",
   "query": "Software Engineer Germany last 7 days",
   "all": {
-    "jobCount": 45,
+    "jobCount": 44,
     "partial": false,
     "providers": [
       {
         "providerId": "arbeitnow",
         "ok": true,
-        "jobsReturned": 8,
+        "jobsReturned": 10,
         "errorCode": null
       },
       {
@@ -20,7 +20,7 @@
       {
         "providerId": "adzuna",
         "ok": true,
-        "jobsReturned": 32,
+        "jobsReturned": 4,
         "errorCode": null
       },
       {
@@ -32,54 +32,73 @@
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 5,
+        "jobsReturned": 28,
         "errorCode": null
       }
     ],
     "countsBySource": [
       {
         "provider": "adzuna",
-        "count": 30
+        "count": 4
       },
       {
         "provider": "arbeitnow",
-        "count": 7
+        "count": 9
+      },
+      {
+        "provider": "ashby",
+        "count": 2
+      },
+      {
+        "provider": "greenhouse",
+        "count": 2
+      },
+      {
+        "provider": "indeed",
+        "count": 20
       },
       {
         "provider": "jooble",
         "count": 3
       },
       {
-        "provider": "stepstone",
-        "count": 5
+        "provider": "lever",
+        "count": 4
       }
     ]
   },
   "linkedin": {
-    "jobCount": 0,
+    "jobCount": 2,
     "partial": false,
     "providerHealth": [
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 0,
+        "jobsReturned": 2,
         "errorCode": null
       }
     ],
-    "sampleUrls": []
+    "sampleUrls": [
+      "https://de.linkedin.com/jobs/view/lead-software-engineer-%E2%80%93-avionics-mission-systems-xxx-at-alten-germany-4417609876",
+      "https://de.linkedin.com/jobs/view/software-engineer-%E2%80%94-agent-guardrails-at-european-tech-recruit-4453075923"
+    ]
   },
   "indeed": {
-    "jobCount": 0,
+    "jobCount": 20,
     "partial": false,
     "providerHealth": [
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 0,
+        "jobsReturned": 20,
         "errorCode": null
       }
     ],
-    "sampleUrls": []
+    "sampleUrls": [
+      "https://de.indeed.com/viewjob?jk=fcec72c7a2329c6a",
+      "https://de.indeed.com/viewjob?jk=6769ec7be3500732",
+      "https://de.indeed.com/viewjob?jk=fe86edef7e6b44bf"
+    ]
   },
   "xing": {
     "jobCount": 0,
@@ -95,33 +114,35 @@
     "sampleUrls": []
   },
   "stepstone": {
-    "jobCount": 5,
+    "jobCount": 1,
     "partial": false,
     "providerHealth": [
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 5,
+        "jobsReturned": 1,
         "errorCode": null
       }
     ],
     "sampleUrls": [
-      "https://www.stepstone.de/stellenangebote--GERMANY-Software-developer-C-for-IT-automation-solutions-m-f-d-in-an-international-RD-team-Germany-EROWA-Software-Services-GmbH--12554223-inline.html",
-      "https://www.stepstone.de/stellenangebote--software-engineer-security-full-time-ulm-germany-noelscher-consulting-gmbh--12390572-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP",
-      "https://www.stepstone.de/stellenangebote--Embedded-Software-Engineer-m-f-d-Berlin-Germany-Novanta--13418595-inline.html"
+      "https://www.stepstone.de/stellenangebote--senior-software-developer-all-genders-ai-and-cloud-applications-stremler-germany-stremler-ag--12566541-inline.html"
     ]
   },
   "glassdoor": {
-    "jobCount": 0,
+    "jobCount": 9,
     "partial": false,
     "providerHealth": [
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 0,
+        "jobsReturned": 9,
         "errorCode": null
       }
     ],
-    "sampleUrls": []
+    "sampleUrls": [
+      "https://www.glassdoor.de/job-listing/senior-software-engineer-python-backend-dlthub-JV_IC2622109_KO0,39_KE40,46.htm?jl=1010039172120",
+      "https://www.glassdoor.de/job-listing/autonomous-drone-software-engineer-%E2%80%93-swarm-systems-m-w-d-autonomous-teaming-JV_IC4990924_KO0,56_KE57,75.htm?jl=1009988655921",
+      "https://www.glassdoor.de/job-listing/software-engineer-jmrc-germany-support-general-dynamics-mission-systems-JV_IC2565592_KO0,38_KE39,71.htm?jl="
+    ]
   }
 }

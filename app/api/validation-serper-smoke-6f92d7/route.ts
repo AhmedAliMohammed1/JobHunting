@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const BASE = "https://job-hunting-two-gamma.vercel.app/api/jobs/search";
-const QUERY = "Software Engineer Germany last 7 days";
+const QUERY = "Software Engineer Germany last 24 hours";
 
 type SearchResponse = {
   jobs?: Array<{ provider?: string; sourceUrl?: string }>;

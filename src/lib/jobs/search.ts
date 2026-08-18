@@ -11,6 +11,12 @@ export interface AggregatedSearchResult {
   partial: boolean;
 }
 
+const PRIORITY_JOB_SOURCES = new Map<string, number>([
+  ["linkedin", 1],
+  ["indeed", 0.98],
+  ["xing", 0.96],
+]);
+
 function normalized(value: string | undefined): string {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/[^\p{L}\p{N}+#.]+/gu, " ").replace(/\s+/g, " ").trim() ?? "";
 }
@@ -99,9 +105,20 @@ function sourceQuality(job: NormalizedJob): number {
   }
 }
 
-function rankWithoutProfile(jobs: NormalizedJob[], query: JobSearchQuery): NormalizedJob[] {
+export function providerPriority(job: Pick<NormalizedJob, "provider">): number {
+  return PRIORITY_JOB_SOURCES.get(job.provider.toLowerCase()) ?? 0.35;
+}
+
+export function rankWithoutProfile(jobs: NormalizedJob[], query: JobSearchQuery): NormalizedJob[] {
   return [...jobs].sort((a, b) => {
-    const score = (job: NormalizedJob) => 0.6 * lexicalScore(job, query) + 0.25 * recencyScore(job) + 0.15 * sourceQuality(job);
+    // LinkedIn, Indeed and XING are deliberately favored for fresh-job discovery.
+    // Relevance and recency remain the majority of the score so unrelated jobs
+    // from a priority source cannot outrank a clearly matching role.
+    const score = (job: NormalizedJob) =>
+      0.45 * lexicalScore(job, query)
+      + 0.25 * recencyScore(job)
+      + 0.25 * providerPriority(job)
+      + 0.05 * sourceQuality(job);
     return score(b) - score(a);
   });
 }

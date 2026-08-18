@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("public job page metadata", () => {
-  it("extracts JobPosting title, company, location and date", async () => {
+  it("extracts JobPosting title, company, location, country and date", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(`<!doctype html><html><head><script type="application/ld+json">{
       "@context":"https://schema.org",
       "@type":"JobPosting",
@@ -23,10 +23,39 @@ describe("public job page metadata", () => {
       title: "Software Engineer",
       company: "Example GmbH",
       location: "Berlin, Germany",
+      country: "Germany",
       datePosted: "2026-08-18",
       employmentType: "Full-time",
       description: "Build reliable backend services.",
     });
+  });
+
+  it("extracts a schema.org Country object instead of dropping it", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`<!doctype html><script type="application/ld+json">{
+      "@context":"https://schema.org",
+      "@type":"JobPosting",
+      "title":"Embedded Software Engineer",
+      "datePosted":"2026-08-18",
+      "jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressLocality":"München","addressRegion":"Bayern","addressCountry":{"@type":"Country","name":"Germany"}}}
+    }</script>`, { status: 200, headers: { "content-type": "text/html" } })));
+
+    await expect(fetchPublicJobPageMetadata("https://example.com/jobs/country-object")).resolves.toMatchObject({
+      location: "München, Bayern, Germany",
+      country: "Germany",
+    });
+  });
+
+  it("uses applicantLocationRequirements for remote country metadata", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`<!doctype html><script type="application/ld+json">{
+      "@context":"https://schema.org",
+      "@type":"JobPosting",
+      "title":"Firmware Engineer",
+      "datePosted":"2026-08-18",
+      "jobLocationType":"TELECOMMUTE",
+      "applicantLocationRequirements":{"@type":"Country","name":"Germany"}
+    }</script>`, { status: 200, headers: { "content-type": "text/html" } })));
+
+    await expect(fetchPublicJobPageMetadata("https://example.com/jobs/remote")).resolves.toMatchObject({ country: "Germany" });
   });
 
   it("extracts LinkedIn-style time, employment and seniority from visible page metadata", async () => {

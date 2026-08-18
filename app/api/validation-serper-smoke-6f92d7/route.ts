@@ -1,59 +1,62 @@
-import { getServerEnv } from "@/src/config/env";
-import { detectJobSource, isLikelyJobUrl } from "@/src/lib/jobs/providers/discovery";
-import { createSerperSearchProvider } from "@/src/lib/jobs/providers/serper";
-
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const PATH_QUERIES: Record<string, string[]> = {
-  linkedin: [
-    'site:linkedin.com/jobs/view "Software Engineer" Germany',
-    'site:de.linkedin.com/jobs/view "Software Engineer" Germany',
-    'site:linkedin.com inurl:jobs/view "Software Engineer" Germany',
-  ],
-  indeed: [
-    'site:de.indeed.com/viewjob "Software Engineer" Germany',
-    'site:indeed.com/viewjob "Software Engineer" Germany',
-    'site:indeed.com inurl:viewjob "Software Engineer" Germany',
-  ],
-  glassdoor: [
-    'site:glassdoor.com/job-listing "Software Engineer" Germany',
-    'site:glassdoor.de/job-listing "Software Engineer" Germany',
-    'site:glassdoor.com inurl:job-listing "Software Engineer" Germany',
-  ],
+const BASE = "https://job-hunting-two-gamma.vercel.app/api/jobs/search";
+const QUERY = "Software Engineer Germany last 7 days";
+
+type SearchResponse = {
+  jobs?: Array<{ provider?: string; sourceUrl?: string }>;
+  partial?: boolean;
+  providers?: Array<{ providerId?: string; ok?: boolean; jobsReturned?: number; errorCode?: string | null }>;
 };
 
-function sanitize(rows: Awaited<ReturnType<ReturnType<typeof createSerperSearchProvider>["search"]>>) {
-  return rows.map((row) => ({
-    title: row.title,
-    url: row.url,
-    detectedSource: detectJobSource(row.url),
-    likelyJobUrl: isLikelyJobUrl(row.url),
-    content: row.content?.slice(0, 180),
-  }));
+async function runSearch(provider?: string): Promise<SearchResponse> {
+  const filters: { limit: number; providers?: string[] } = { limit: 50 };
+  if (provider) filters.providers = [provider];
+  const response = await fetch(BASE, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: QUERY, filters }),
+  });
+  if (!response.ok) throw new Error(`${provider ?? "all"} search returned ${response.status}: ${await response.text()}`);
+  return (await response.json()) as SearchResponse;
 }
 
-async function attempt(
-  serper: ReturnType<typeof createSerperSearchProvider>,
-  query: string,
-) {
-  try {
-    const rows = await serper.search(query, { maxResults: 10, searchDepth: "advanced" });
-    return { ok: true, query, count: rows.length, validCount: rows.filter((row) => isLikelyJobUrl(row.url)).length, rows: sanitize(rows) };
-  } catch (error) {
-    return { ok: false, query, error: error instanceof Error ? error.message : "unknown" };
-  }
+function summarize(response: SearchResponse) {
+  const jobs = response.jobs ?? [];
+  return {
+    jobCount: jobs.length,
+    partial: response.partial ?? false,
+    providerHealth: (response.providers ?? []).map(({ providerId, ok, jobsReturned, errorCode }) => ({ providerId, ok, jobsReturned, errorCode })),
+    countsBySource: Object.entries(jobs.reduce<Record<string, number>>((counts, job) => {
+      const source = job.provider ?? "unknown";
+      counts[source] = (counts[source] ?? 0) + 1;
+      return counts;
+    }, {})).map(([provider, count]) => ({ provider, count })),
+    sampleUrls: jobs.slice(0, 5).map((job) => job.sourceUrl).filter(Boolean),
+  };
 }
 
 export async function GET() {
-  const env = getServerEnv();
-  if (!env.SERPER_API_KEY) return Response.json({ error: "SERPER_API_KEY is not configured" }, { status: 503 });
-  const serper = createSerperSearchProvider(env.SERPER_API_KEY, 60);
-  const diagnostics: Record<string, unknown> = {};
-
-  for (const [source, queries] of Object.entries(PATH_QUERIES)) {
-    diagnostics[source] = await Promise.all(queries.map((query) => attempt(serper, query)));
+  try {
+    const all = await runSearch();
+    const linkedin = await runSearch("linkedin");
+    const indeed = await runSearch("indeed");
+    const xing = await runSearch("xing");
+    const stepstone = await runSearch("stepstone");
+    const glassdoor = await runSearch("glassdoor");
+    return Response.json({
+      testedAt: new Date().toISOString(),
+      query: QUERY,
+      all: summarize(all),
+      linkedin: summarize(linkedin),
+      indeed: summarize(indeed),
+      xing: summarize(xing),
+      stepstone: summarize(stepstone),
+      glassdoor: summarize(glassdoor),
+    });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "Unknown validation error" }, { status: 500 });
   }
-
-  return Response.json({ testedAt: new Date().toISOString(), diagnostics });
 }

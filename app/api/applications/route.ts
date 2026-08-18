@@ -3,13 +3,15 @@ import { getCurrentUser } from "@/src/lib/auth/user";
 import { createClient } from "@/src/lib/database/supabase/server";
 import { applicationCreateSchema } from "@/src/lib/validation/product";
 
+const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
+
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders });
   const supabase = await createClient();
   const { data, error } = await supabase!.from("applications").select("id,state,stage,mode,risk,application_url,confirmation_status,applied_at,created_at,updated_at,job:jobs(id,title,company,location,status)").eq("user_id", user.id).order("updated_at", { ascending: false });
-  if (error) return NextResponse.json({ error: "Could not load applications." }, { status: 500 });
-  return NextResponse.json({ applications: data ?? [] });
+  if (error) return NextResponse.json({ error: "Could not load applications." }, { status: 500, headers: privateHeaders });
+  return NextResponse.json({ applications: data ?? [] }, { headers: privateHeaders });
 }
 
 export async function POST(request: Request) {

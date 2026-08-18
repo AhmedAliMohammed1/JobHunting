@@ -85,7 +85,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     const requestBody: Record<string, unknown> = {
       model: this.configuration.model,
       messages: [
-        { role: "system", content: "Return only truthful information supported by the supplied context. Unknown facts must be null or UNKNOWN." },
+        { role: "system", content: "Return only truthful information supported by the supplied context. Never invent unsupported facts. Use null where the schema permits unknown scalar values and empty arrays for unknown list values." },
         { role: "user", content: prompt },
       ],
       response_format: {

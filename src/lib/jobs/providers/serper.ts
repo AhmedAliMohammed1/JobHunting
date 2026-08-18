@@ -84,7 +84,9 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
         title: result.title,
         url: result.link,
         content: [result.snippet ?? "", result.date ?? ""].filter(Boolean).join(" "),
-        score: result.position ? 1 / Math.max(1, result.position) : undefined,
+        // Google organic position is a rank, not a Tavily-style semantic relevance score.
+        // Do not convert it to 1 / position because the downstream relevance threshold
+        // would incorrectly discard valid job-detail pages appearing below position four.
         publishedDate: result.date ?? undefined,
       }));
       cache.set(key, { expiresAt: Date.now() + cacheTtlSeconds * 1_000, value });

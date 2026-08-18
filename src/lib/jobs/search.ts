@@ -2,6 +2,7 @@ import { log } from "@/src/lib/observability/logger";
 import type { JobSearchQuery, NormalizedJob, ProviderSearchResult } from "@/src/types/jobs";
 import { deduplicateJobs } from "./deduplicate";
 import { withFreshness } from "./freshness";
+import { fetchPublicJobPageMetadata } from "./job-page-metadata";
 import { configuredJobProviders } from "./providers";
 import { withRetry } from "./retry";
 
@@ -16,8 +17,13 @@ export interface AggregatedSearchResult {
 const PRIORITY_JOB_SOURCES = new Map<string, number>([
   ["linkedin", 1],
   ["indeed", 0.98],
+  ["stepstone", 0.97],
   ["xing", 0.96],
+  ["glassdoor", 0.9],
 ]);
+
+const MAX_DISCOVERY_METADATA_ENRICHMENTS = 36;
+const DISCOVERY_METADATA_CONCURRENCY = 8;
 
 function normalized(value: string | undefined): string {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/[^\p{L}\p{N}+#.]+/gu, " ").replace(/\s+/g, " ").trim() ?? "";
@@ -123,6 +129,88 @@ export function rankWithoutProfile(jobs: NormalizedJob[], query: JobSearchQuery)
   });
 }
 
+function hasVerifiablePostedAt(job: NormalizedJob): boolean {
+  return Boolean(job.postedAt && Number.isFinite(Date.parse(job.postedAt)));
+}
+
+function hasKnownCompany(job: NormalizedJob): boolean {
+  return !/^(?:company not supplied|unknown company)$/i.test(job.company);
+}
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  if (!items.length) return [];
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  async function runWorker(): Promise<void> {
+    while (true) {
+      const index = next;
+      next += 1;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker()));
+  return results;
+}
+
+async function enrichDiscoveryJob(job: NormalizedJob): Promise<NormalizedJob> {
+  const url = job.sourceUrl ?? job.applicationUrl;
+  if (!url) return job;
+
+  const page = await fetchPublicJobPageMetadata(url);
+  if (page.dead) return job;
+  const parsedPostedAt = page.datePosted ? Date.parse(page.datePosted) : Number.NaN;
+
+  return {
+    ...job,
+    title: page.title ?? job.title,
+    company: !hasKnownCompany(job) && page.company ? page.company : job.company,
+    location: job.location ?? page.location,
+    description: page.description ?? job.description,
+    employmentType: job.employmentType ?? page.employmentType,
+    seniority: job.seniority ?? page.seniority,
+    postedAt: Number.isFinite(parsedPostedAt) ? new Date(parsedPostedAt).toISOString() : job.postedAt,
+  };
+}
+
+async function enrichRelevantUndatedDiscoveryJobs(
+  jobs: NormalizedJob[],
+  query: JobSearchQuery,
+  now: number,
+): Promise<NormalizedJob[]> {
+  if (query.postedWithinHours === undefined || !jobs.length) return jobs;
+
+  const withoutRecency = { ...query, postedWithinHours: undefined };
+  const indexes = jobs
+    .map((job, index) => ({ job, index }))
+    .filter(({ job }) => job.sourceType === "search-discovery" && !hasVerifiablePostedAt(job) && jobMatchesQuery(job, withoutRecency, now))
+    .slice(0, MAX_DISCOVERY_METADATA_ENRICHMENTS);
+
+  if (!indexes.length) return jobs;
+
+  const enriched = await mapWithConcurrency(indexes, DISCOVERY_METADATA_CONCURRENCY, async ({ job, index }) => ({
+    index,
+    job: await enrichDiscoveryJob(job),
+  }));
+  const copy = [...jobs];
+  let recoveredDates = 0;
+
+  for (const item of enriched) {
+    copy[item.index] = item.job;
+    if (hasVerifiablePostedAt(item.job)) recoveredDates += 1;
+  }
+
+  log("info", "job_discovery_metadata_enriched", {
+    attempted: indexes.length,
+    recoveredDates,
+    stillUndated: indexes.length - recoveredDates,
+  });
+
+  return copy;
+}
+
 export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearchResult> {
   const providers = configuredJobProviders(query);
   const settled = await Promise.allSettled(providers.map(async (provider): Promise<ProviderSearchResult> => {
@@ -143,7 +231,13 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
   });
 
   const now = Date.now();
-  const filteredResults = results.map((result) => {
+  const enrichedResults = await Promise.all(results.map(async (result) => {
+    if (result.providerId !== "web-discovery") return result;
+    const jobs = await enrichRelevantUndatedDiscoveryJobs(result.jobs, query, now);
+    return { ...result, jobs };
+  }));
+
+  const filteredResults = enrichedResults.map((result) => {
     const jobs = result.jobs.filter((job) => jobMatchesQuery(job, query, now));
     return { ...result, jobs, health: { ...result.health, jobsReturned: jobs.length } };
   });
@@ -160,6 +254,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
     totalMatches: ranked.length,
     returned: jobs.length,
     sourceBreakdown: JSON.stringify(sourceBreakdown),
+    rawProviderRows: JSON.stringify(Object.fromEntries(results.map((result) => [result.providerId, result.jobs.length]))),
     providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length]))),
   });
 

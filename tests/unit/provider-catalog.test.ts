@@ -8,6 +8,7 @@ describe("job provider catalog", () => {
     delete process.env.ADZUNA_APP_KEY;
     delete process.env.JOOBLE_API_KEY;
     delete process.env.TAVILY_API_KEY;
+    delete process.env.BRAVE_SEARCH_API_KEY;
     delete process.env.JOB_CAREER_SOURCES_JSON;
     delete process.env.ENABLE_REMOTE_OK;
   });
@@ -24,15 +25,26 @@ describe("job provider catalog", () => {
 
   it("marks discovery-backed public sites and ATS sources enabled without exposing secrets", () => {
     process.env.TAVILY_API_KEY = "tvly-super-secret";
+    process.env.BRAVE_SEARCH_API_KEY = "brave-super-secret";
     process.env.ADZUNA_APP_ID = "app-id";
     process.env.ADZUNA_APP_KEY = "adzuna-secret";
     const catalog = jobProviderCatalog(getServerEnv());
     expect(catalog.find(({ id }) => id === "linkedin")?.availability).toBe("discovery");
+    expect(catalog.find(({ id }) => id === "linkedin")?.detail).toContain("Brave Search");
     expect(catalog.find(({ id }) => id === "greenhouse")?.availability).toBe("ats-discovery");
     expect(catalog.find(({ id }) => id === "adzuna")?.availability).toBe("active");
     const serialized = JSON.stringify(catalog);
     expect(serialized).not.toContain("tvly-super-secret");
+    expect(serialized).not.toContain("brave-super-secret");
     expect(serialized).not.toContain("adzuna-secret");
+  });
+
+  it("supports Brave Search as the only public discovery provider", () => {
+    process.env.BRAVE_SEARCH_API_KEY = "brave-only-secret";
+    const catalog = jobProviderCatalog(getServerEnv());
+    expect(catalog.find(({ id }) => id === "linkedin")?.availability).toBe("discovery");
+    expect(catalog.find(({ id }) => id === "linkedin")?.detail).toContain("Brave Search public-job discovery enabled");
+    expect(JSON.stringify(catalog)).not.toContain("brave-only-secret");
   });
 
   it("marks an employer ATS active through the central registry even without discovery", () => {

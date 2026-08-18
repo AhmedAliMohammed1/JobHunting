@@ -359,8 +359,6 @@ async function enrichRelevantDiscoveryJobs(
 ): Promise<NormalizedJob[]> {
   if (!jobs.length || (query.postedWithinHours === undefined && !query.countries.length)) return jobs;
 
-  // Search snippets often carry a usable date but omit the country, or vice versa.
-  // Verify whichever strict field is missing before throwing the listing away.
   const preMetadataQuery: JobSearchQuery = {
     ...query,
     keywords: [],
@@ -403,7 +401,7 @@ async function enrichRelevantDiscoveryJobs(
     attempted: indexes.length,
     recoveredDates,
     recoveredCountries,
-    stillUndated: indexes.filter(({ job }) => !hasVerifiablePostedAt(copy[jobs.indexOf(job)])).length,
+    stillUndated: enriched.filter((item) => !hasVerifiablePostedAt(item.job)).length,
     stillUnknownCountry: enriched.filter((item) => isUnknownCountry(item.job.country)).length,
   });
 
@@ -470,8 +468,8 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
     totalMatches: ranked.length,
     returned: jobs.length,
     sourceBreakdown: JSON.stringify(sourceBreakdown),
-    rawProviderRows: JSON.stringify(Object.fromEntries(results.map((result) => [result.providerId, result.jobs.length])),
-    providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length])),
+    rawProviderRows: JSON.stringify(Object.fromEntries(results.map((result) => [result.providerId, result.jobs.length]))),
+    providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length]))),
   });
 
   return {

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FileText, FileUp, LockKeyhole, RefreshCw, Trash2 } from "lucide-react";
-import { createClient } from "@/src/lib/database/supabase/client";
 
 type Document = {
   id: string;
@@ -31,19 +30,14 @@ export function CvUpload() {
   useEffect(() => { void load(); }, [load]);
 
   async function processDocument(id: string) {
-    const supabase = createClient();
-    if (!supabase) {
-      setMessage("CV parsing is not configured in this environment.");
-      return;
-    }
-
     setProcessingId(id);
     try {
       setMessage("Extracting text from your CV…");
-      const { error: parseError } = await supabase.functions.invoke("parse-cv", { body: { documentId: id } });
-      if (parseError) {
+      const parseResponse = await fetch(`/api/cv/${id}/process`, { method: "POST", cache: "no-store" });
+      const parseBody = await parseResponse.json() as { error?: string };
+      if (!parseResponse.ok) {
         await load();
-        setMessage("CV text extraction failed. See the document error below and try again.");
+        setMessage(parseBody.error ?? "CV text extraction failed. Try processing this CV again.");
         return;
       }
 

@@ -22,6 +22,7 @@ const serverEnvSchema = z.object({
   ADZUNA_COUNTRIES: z.string().default("de,gb,us"),
   JOOBLE_API_KEY: z.string().min(1).optional(),
   TAVILY_API_KEY: z.string().min(1).optional(),
+  BRAVE_SEARCH_API_KEY: z.string().min(1).optional(),
   JOB_CAREER_SOURCES_JSON: z.string().default("[]"),
   SEARCH_DISCOVERY_CACHE_TTL_SECONDS: z.coerce.number().int().min(60).max(86400).default(600),
   JOB_PROVIDER_MODE: z.enum(["mock", "live"]).default("mock"),

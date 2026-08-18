@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { JobFreshnessStatus, JobSourceType, NormalizedJob, WorkplaceType } from "@/src/types/jobs";
+import { inferDiscoveryMetadata } from "./discovery-metadata";
 
 export function stableJobId(provider: string, externalId: string): string {
   return createHash("sha256").update(`${provider}:${externalId}`).digest("hex").slice(0, 32);
@@ -80,18 +81,35 @@ export function normalizedJob(input: {
 }): NormalizedJob {
   const now = new Date().toISOString();
   const description = cleanText(input.description);
+  const sourceType = input.sourceType ?? sourceTypeFor(input.provider);
+  const discoveryMetadata = sourceType === "search-discovery"
+    ? inferDiscoveryMetadata({
+      provider: input.provider,
+      title: input.title,
+      company: input.company,
+      location: input.location,
+      description,
+      sourceUrl: input.sourceUrl,
+      postedAt: input.postedAt,
+    })
+    : {};
+  const location = cleanText(input.location) ?? cleanText(discoveryMetadata.location);
+  const country = cleanText(input.country) ?? cleanText(discoveryMetadata.country);
+  const company = cleanText(discoveryMetadata.company) ?? cleanText(input.company) ?? "Unknown company";
+  const postedAt = input.postedAt ?? discoveryMetadata.postedAt;
+
   return {
     id: stableJobId(input.provider, input.externalId),
     externalId: input.externalId,
     provider: input.provider,
-    sourceType: input.sourceType ?? sourceTypeFor(input.provider),
+    sourceType,
     title: cleanText(input.title) ?? "Untitled role",
-    company: cleanText(input.company) ?? "Unknown company",
+    company,
     companyLogo: input.companyLogo,
-    location: cleanText(input.location),
-    country: cleanText(input.country),
+    location,
+    country,
     city: cleanText(input.city),
-    workplaceType: input.workplaceType ?? inferWorkplaceType(input.location, description),
+    workplaceType: input.workplaceType ?? inferWorkplaceType(location, description),
     employmentType: cleanText(input.employmentType),
     seniority: cleanText(input.seniority) ?? inferSeniority(input.title) ?? inferSeniority(description),
     salaryText: cleanText(input.salaryText),
@@ -101,7 +119,7 @@ export function normalizedJob(input: {
     description,
     snippet: cleanText(input.snippet) ?? description?.slice(0, 320),
     skills: [...new Set([...inferSkills(description), ...(input.skills ?? []).map((skill) => cleanText(skill)).filter((skill): skill is string => Boolean(skill))])],
-    postedAt: input.postedAt,
+    postedAt,
     firstDiscoveredAt: now,
     lastSeenAt: now,
     lastVerifiedAt: now,

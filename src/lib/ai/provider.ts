@@ -47,6 +47,15 @@ export class MockAIProvider implements AIProvider {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientNetworkError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return error.name === "TimeoutError" || error.name === "AbortError" || error.name === "TypeError" || /timeout|fetch failed|network/i.test(error.message);
+}
+
 export class OpenAICompatibleProvider implements AIProvider {
   readonly id = "openai-compatible";
   constructor(
@@ -58,19 +67,48 @@ export class OpenAICompatibleProvider implements AIProvider {
     },
   ) {}
 
-  private async request<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.configuration.baseUrl.replace(/\/$/, "")}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.configuration.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(45_000),
-    });
-    const payload = (await response.json()) as T & { error?: { message?: string } };
-    if (!response.ok) throw new Error(payload.error?.message ?? `AI provider returned ${response.status}.`);
-    return payload;
+  private async request<T>(
+    path: string,
+    body: unknown,
+    options: { timeoutMs?: number; retries?: number } = {},
+  ): Promise<T> {
+    const timeoutMs = options.timeoutMs ?? 45_000;
+    const retries = options.retries ?? 0;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        const response = await fetch(`${this.configuration.baseUrl.replace(/\/$/, "")}${path}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.configuration.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+
+        const payload = await response.json().catch(() => ({})) as T & { error?: { message?: string } };
+        if (response.ok) return payload;
+
+        const error = new Error(payload.error?.message ?? `AI provider returned ${response.status}.`);
+        const retryableStatus = [408, 429, 502, 503].includes(response.status);
+        if (!retryableStatus || attempt >= retries) throw error;
+
+        const retryAfter = Number(response.headers.get("Retry-After"));
+        const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 5_000)
+          : 750;
+        await sleep(delayMs);
+      } catch (error) {
+        if (attempt < retries && isTransientNetworkError(error)) {
+          await sleep(750);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error("AI provider request failed after retrying.");
   }
 
   private isOpenRouter() {
@@ -92,11 +130,22 @@ export class OpenAICompatibleProvider implements AIProvider {
         type: "json_schema",
         json_schema: { name: schemaName, strict: true, schema },
       },
+      max_tokens: 3_000,
     };
 
-    if (this.isOpenRouter()) requestBody.provider = { require_parameters: true };
+    if (this.isOpenRouter()) {
+      requestBody.provider = {
+        require_parameters: true,
+        allow_fallbacks: true,
+        sort: "latency",
+      };
+    }
 
-    const payload = await this.request<ChatCompletionResponse>("/chat/completions", requestBody);
+    const payload = await this.request<ChatCompletionResponse>(
+      "/chat/completions",
+      requestBody,
+      this.isOpenRouter() ? { timeoutMs: 60_000, retries: 1 } : { timeoutMs: 45_000, retries: 0 },
+    );
     const content = payload.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI provider returned no structured content.");
     return JSON.parse(content) as T;

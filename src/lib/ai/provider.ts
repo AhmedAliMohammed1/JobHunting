@@ -56,6 +56,13 @@ function isTransientNetworkError(error: unknown) {
   return error.name === "TimeoutError" || error.name === "AbortError" || error.name === "TypeError" || /timeout|fetch failed|network/i.test(error.message);
 }
 
+function structuredMessages(prompt: string) {
+  return [
+    { role: "system", content: "Return only truthful information supported by the supplied context. Never invent unsupported facts. Use null where the schema permits unknown scalar values and empty arrays for unknown list values." },
+    { role: "user", content: prompt },
+  ];
+}
+
 export class OpenAICompatibleProvider implements AIProvider {
   readonly id = "openai-compatible";
   constructor(
@@ -97,11 +104,11 @@ export class OpenAICompatibleProvider implements AIProvider {
         const retryAfter = Number(response.headers.get("Retry-After"));
         const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 10_000)
-          : 750;
+          : 750 * (attempt + 1);
         await sleep(delayMs);
       } catch (error) {
         if (attempt < retries && isTransientNetworkError(error)) {
-          await sleep(750);
+          await sleep(750 * (attempt + 1));
           continue;
         }
         throw error;
@@ -119,50 +126,28 @@ export class OpenAICompatibleProvider implements AIProvider {
     }
   }
 
-  private structuredModel() {
-    // The generic free router can randomly select high-latency reasoning models.
-    // Pin structured extraction to a free model that supports structured outputs.
-    // Explicitly configured model IDs are always respected.
-    if (this.isOpenRouter() && this.configuration.model === "openrouter/free") {
-      return "google/gemma-4-26b-a4b-it:free";
-    }
-    return this.configuration.model;
+  private providerPreferences() {
+    return {
+      require_parameters: true,
+      allow_fallbacks: true,
+      sort: "latency",
+    };
   }
 
-  private structuredFallbackModels(primaryModel: string) {
-    if (!this.isOpenRouter()) return [];
-    const configuredModel = this.configuration.model;
-    const isFreeConfiguration = configuredModel === "openrouter/free" || configuredModel.endsWith(":free");
-    if (!isFreeConfiguration || primaryModel === "openrouter/free") return [];
-    return ["openrouter/free"];
-  }
-
-  async generateStructured<T>(prompt: string, schema: unknown, schemaName = "jobhunter_result"): Promise<T> {
-    const primaryModel = this.structuredModel();
-    const fallbackModels = this.structuredFallbackModels(primaryModel);
+  private async structuredRequest<T>(prompt: string, schema: unknown, schemaName: string): Promise<T> {
     const requestBody: Record<string, unknown> = {
-      model: primaryModel,
-      messages: [
-        { role: "system", content: "Return only truthful information supported by the supplied context. Never invent unsupported facts. Use null where the schema permits unknown scalar values and empty arrays for unknown list values." },
-        { role: "user", content: prompt },
-      ],
+      // Respect the configured OpenRouter model. In particular, openrouter/free already
+      // filters the free model pool for requested capabilities such as structured output.
+      model: this.configuration.model,
+      messages: structuredMessages(prompt),
       response_format: {
         type: "json_schema",
         json_schema: { name: schemaName, strict: true, schema },
       },
       temperature: 0.1,
-      max_tokens: 2_500,
+      max_tokens: 4_500,
     };
-
-    if (fallbackModels.length) requestBody.models = fallbackModels;
-
-    if (this.isOpenRouter()) {
-      requestBody.provider = {
-        require_parameters: true,
-        allow_fallbacks: true,
-        sort: "latency",
-      };
-    }
+    if (this.isOpenRouter()) requestBody.provider = this.providerPreferences();
 
     const payload = await this.request<ChatCompletionResponse>(
       "/chat/completions",
@@ -172,6 +157,39 @@ export class OpenAICompatibleProvider implements AIProvider {
     const content = payload.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI provider returned no structured content.");
     return JSON.parse(content) as T;
+  }
+
+  private async jsonObjectFallback<T>(prompt: string, schema: unknown): Promise<T> {
+    const schemaPrompt = `${prompt}\n\nReturn one JSON object that matches this JSON Schema exactly. Do not add keys outside the schema:\n${JSON.stringify(schema)}`;
+    const requestBody: Record<string, unknown> = {
+      model: this.configuration.model,
+      messages: structuredMessages(schemaPrompt),
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 4_500,
+    };
+    if (this.isOpenRouter()) requestBody.provider = this.providerPreferences();
+
+    const payload = await this.request<ChatCompletionResponse>(
+      "/chat/completions",
+      requestBody,
+      { timeoutMs: 60_000, retries: 1 },
+    );
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) throw new Error("AI provider returned no JSON fallback content.");
+    return JSON.parse(content) as T;
+  }
+
+  async generateStructured<T>(prompt: string, schema: unknown, schemaName = "jobhunter_result"): Promise<T> {
+    try {
+      return await this.structuredRequest<T>(prompt, schema, schemaName);
+    } catch (error) {
+      // OpenRouter free capacity can change from request to request. If strict JSON-schema
+      // routing is temporarily unavailable, retry with JSON-object mode and let the
+      // caller's Zod validator decide whether the payload is acceptable.
+      if (!this.isOpenRouter()) throw error;
+      return this.jsonObjectFallback<T>(prompt, schema);
+    }
   }
 
   async embed(text: string): Promise<number[]> {

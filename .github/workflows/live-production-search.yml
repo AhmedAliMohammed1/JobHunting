@@ -1,3 +1,4 @@
+# Serper production recheck 2026-08-18
 name: Live production job search smoke
 
 on:

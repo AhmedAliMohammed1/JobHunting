@@ -27,17 +27,32 @@ describe("AI provider adapters", () => {
     expect(JSON.parse(String(options.body)).response_format.json_schema.strict).toBe(true);
   });
 
-  it("uses OpenRouter structured-output routing with a free model fallback", async () => {
+  it("uses the configured OpenRouter free router with structured-output filtering", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"ok\":true}" } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/free", embeddingModel: "embed" });
     await provider.generateStructured("prompt", { type: "object" }, "result");
     const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(options.body));
-    expect(body.model).toBe("google/gemma-4-26b-a4b-it:free");
-    expect(body.models).toEqual(["openrouter/free"]);
+    expect(body.model).toBe("openrouter/free");
+    expect(body.models).toBeUndefined();
     expect(body.provider).toEqual({ require_parameters: true, allow_fallbacks: true, sort: "latency" });
     expect(body.response_format.type).toBe("json_schema");
+  });
+
+  it("falls back to JSON-object mode when strict OpenRouter routing fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Structured output temporarily unavailable" } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"ok\":true}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/free", embeddingModel: "embed" });
+    await expect(provider.generateStructured("prompt", { type: "object", properties: { ok: { type: "boolean" } } }, "result")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const secondBody = JSON.parse(String(secondOptions.body));
+    expect(secondBody.model).toBe("openrouter/free");
+    expect(secondBody.response_format).toEqual({ type: "json_object" });
+    expect(secondBody.provider.require_parameters).toBe(true);
   });
 
   it("retries transient OpenRouter provider failures", async () => {

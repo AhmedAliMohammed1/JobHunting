@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { expandSearchQuery } from "@/src/lib/ai/query-expansion";
 import { getAIProvider } from "@/src/lib/ai/provider";
-import { searchJobs } from "@/src/lib/jobs/search";
+import { jobMatchesQuery, searchJobs } from "@/src/lib/jobs/search";
+import { SEARCH_ENGINE_VERSION } from "@/src/lib/jobs/search-engine-version";
 import { interpretSearchQuery, mergeSearchIntent, shouldUseAIQueryExpansion } from "@/src/lib/jobs/query-intent";
 import { rankJobs } from "@/src/lib/matching/rank";
 import { rateLimit } from "@/src/lib/security/rate-limit";
@@ -13,7 +14,10 @@ import type { CandidateProfile, CandidateSkill } from "@/src/types/candidate";
 import type { JobSearchQuery, NormalizedJob } from "@/src/types/jobs";
 import type { MatchResult } from "@/src/types/matching";
 
-const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
+const privateHeaders = {
+  "Cache-Control": "private, no-store, max-age=0",
+  "X-Search-Engine-Version": SEARCH_ENGINE_VERSION,
+};
 
 async function loadCandidateProfile(userId: string): Promise<CandidateProfile | undefined> {
   const supabase = await createClient();
@@ -34,10 +38,17 @@ async function loadCandidateProfile(userId: string): Promise<CandidateProfile | 
   };
 }
 
+function sourceBreakdown(jobs: NormalizedJob[]): Record<string, number> {
+  return jobs.reduce<Record<string, number>>((counts, job) => {
+    counts[job.provider] = (counts[job.provider] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const limit = rateLimit(`job-search:${forwarded ?? "anonymous"}`, 20, 60_000);
-  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly." }, { status: 429, headers: privateHeaders });
+  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly.", engineVersion: SEARCH_ENGINE_VERSION }, { status: 429, headers: privateHeaders });
 
   try {
     const startedAt = Date.now();
@@ -57,6 +68,7 @@ export async function POST(request: Request) {
     const result = await searchJobs(query);
     const warnings: string[] = [];
     let jobs: Array<NormalizedJob & { match?: MatchResult }> = result.jobs;
+
     if (profile) {
       jobs = rankJobs(profile, result.jobs)
         .filter(({ match }) => query.minimumMatchScore === undefined || match.score >= query.minimumMatchScore)
@@ -64,18 +76,37 @@ export async function POST(request: Request) {
     } else if (query.minimumMatchScore !== undefined) {
       warnings.push("Minimum match requires a completed candidate profile, so that filter was not applied.");
     }
+
+    // Final fail-closed validation immediately before serialization. This intentionally
+    // duplicates the aggregate search filter so an upstream/provider regression can
+    // never leak an undated or out-of-window job into a date-filtered response.
+    jobs = jobs.filter((job) => jobMatchesQuery(job, query));
+
     if (query.postedWithinHours !== undefined) {
       warnings.push("Date filters are strict: listings without a verifiable posting date are excluded.");
     }
+
+    const finalBreakdown = sourceBreakdown(jobs);
+
     if (user) {
       const supabase = await createClient();
-      await supabase?.from("search_history").insert({ user_id: user.id, query, expanded_terms: [...query.roles, ...query.keywords], provider_count: result.providers.length, result_count: jobs.length, duration_ms: Date.now() - startedAt });
+      await supabase?.from("search_history").insert({
+        user_id: user.id,
+        query,
+        expanded_terms: [...query.roles, ...query.keywords],
+        provider_count: result.providers.length,
+        result_count: jobs.length,
+        duration_ms: Date.now() - startedAt,
+      });
     }
-    const disclosure = result.providers.some((provider) => provider.providerId === "mock")
+
+    const disclosureBase = result.providers.some((provider) => provider.providerId === "mock")
       ? "Development fixtures — not live listings."
       : result.totalMatches > jobs.length
-        ? `${result.totalMatches} unique live listings matched across ${result.providers.length} source pipelines. Showing the top ${jobs.length} after ranking and filters.`
+        ? `${result.totalMatches} unique live listings matched across ${result.providers.length} source pipelines. Showing ${jobs.length} after final ranking and strict filters.`
         : `${jobs.length} unique live listing${jobs.length === 1 ? "" : "s"} matched across ${result.providers.length} source pipeline${result.providers.length === 1 ? "" : "s"}.`;
+    const disclosure = `${disclosureBase} · Engine ${SEARCH_ENGINE_VERSION}`;
+
     return NextResponse.json({
       jobs,
       providers: result.providers.map(({ health }) => health),
@@ -83,10 +114,14 @@ export async function POST(request: Request) {
       interpretedQuery: query,
       warnings,
       disclosure,
-      totalMatches: result.totalMatches,
-      sourceBreakdown: result.sourceBreakdown,
+      totalMatches: jobs.length,
+      sourceBreakdown: finalBreakdown,
+      engineVersion: SEARCH_ENGINE_VERSION,
     }, { headers: privateHeaders });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed." }, { status: 400, headers: privateHeaders });
+    return NextResponse.json({
+      error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed.",
+      engineVersion: SEARCH_ENGINE_VERSION,
+    }, { status: 400, headers: privateHeaders });
   }
 }

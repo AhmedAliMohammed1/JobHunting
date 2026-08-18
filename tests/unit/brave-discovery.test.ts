@@ -7,7 +7,7 @@ describe("Brave Search discovery adapter", () => {
   });
 
   it("uses the official web-search endpoint with server-side auth, site operators, country and freshness", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
       web: {
         results: [{
           title: "Contabo sucht Software Engineer in Deutschland | LinkedIn",
@@ -44,7 +44,7 @@ describe("Brave Search discovery adapter", () => {
   });
 
   it("throws a provider error for non-success Brave responses", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("rate limited", { status: 429 })));
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response("rate limited", { status: 429 })));
     const provider = createBraveSearchProvider("brave-secret-key", 600);
 
     await expect(provider.search("Data Engineer Egypt brave-error-test", {

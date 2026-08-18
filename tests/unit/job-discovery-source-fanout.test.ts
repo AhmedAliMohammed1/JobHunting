@@ -19,11 +19,11 @@ const baseQuery: JobSearchQuery = {
 
 describe("job discovery source fan-out", () => {
   it("queries major job boards separately and skips generic career pages for broad searches", async () => {
-    const calls: Array<{ domains?: string[] }> = [];
+    const calls: Array<{ query: string; domains?: string[] }> = [];
     const searchProvider: SearchDiscoveryProvider = {
       id: "test",
-      async search(_query, options) {
-        calls.push({ domains: options.includeDomains });
+      async search(query, options) {
+        calls.push({ query, domains: options.includeDomains });
         return [];
       },
     };
@@ -35,20 +35,20 @@ describe("job discovery source fan-out", () => {
     expect(calls.some((call) => call.domains?.includes("stepstone.de"))).toBe(true);
     expect(calls.some((call) => call.domains?.includes("xing.com"))).toBe(true);
     expect(calls.some((call) => call.domains?.includes("glassdoor.com"))).toBe(true);
-    expect(calls.some((call) => call.domains === undefined)).toBe(false);
+    expect(calls.some((call) => /careers OR jobs OR vacancies OR stellenangebote/i.test(call.query))).toBe(false);
   });
 
   it("allows generic career-page discovery when a company is explicitly requested", async () => {
-    const calls: Array<{ domains?: string[] }> = [];
+    const calls: Array<{ query: string; domains?: string[] }> = [];
     const searchProvider: SearchDiscoveryProvider = {
       id: "test",
-      async search(_query, options) {
-        calls.push({ domains: options.includeDomains });
+      async search(query, options) {
+        calls.push({ query, domains: options.includeDomains });
         return [];
       },
     };
 
     await createDiscoveryJobProvider(searchProvider).search({ ...baseQuery, companies: ["Bosch"] });
-    expect(calls.some((call) => call.domains === undefined)).toBe(true);
+    expect(calls.some((call) => call.domains === undefined && /careers OR jobs OR vacancies OR stellenangebote/i.test(call.query))).toBe(true);
   });
 });

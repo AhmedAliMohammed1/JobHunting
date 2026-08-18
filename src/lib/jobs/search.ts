@@ -37,15 +37,24 @@ const ROLE_OCCUPATION_TOKENS = [
 
 const COUNTRY_ALIASES: Record<string, string[]> = {
   germany: ["germany", "deutschland", "de"],
-  deutschland: ["germany", "deutschland", "de"],
-  de: ["germany", "deutschland", "de"],
   egypt: ["egypt", "ägypten", "eg"],
-  "ägypten": ["egypt", "ägypten", "eg"],
-  eg: ["egypt", "ägypten", "eg"],
-  "united kingdom": ["united kingdom", "uk", "great britain", "gb"],
-  uk: ["united kingdom", "uk", "great britain", "gb"],
+  austria: ["austria", "österreich", "at"],
+  switzerland: ["switzerland", "schweiz", "suisse", "svizzera", "ch"],
+  france: ["france", "frankreich", "fr"],
+  netherlands: ["netherlands", "niederlande", "holland", "nl"],
+  belgium: ["belgium", "belgien", "be"],
+  poland: ["poland", "polen", "pl"],
+  czechia: ["czechia", "czech republic", "tschechien", "cz"],
+  denmark: ["denmark", "dänemark", "dk"],
+  sweden: ["sweden", "schweden", "se"],
+  norway: ["norway", "norwegen", "no"],
+  finland: ["finland", "finnland", "fi"],
+  italy: ["italy", "italien", "it"],
+  spain: ["spain", "spanien", "es"],
+  portugal: ["portugal", "pt"],
+  ireland: ["ireland", "irland", "ie"],
+  "united kingdom": ["united kingdom", "great britain", "uk", "gb"],
   "united states": ["united states", "usa", "us"],
-  usa: ["united states", "usa", "us"],
 };
 
 const COUNTRY_LOCATION_HINTS: Record<string, string[]> = {
@@ -56,6 +65,7 @@ const COUNTRY_LOCATION_HINTS: Record<string, string[]> = {
     "braunschweig", "saarbrücken", "jena", "bielefeld", "bochum", "bonn", "würzburg", "mainz", "wiesbaden",
     "freiburg", "bavaria", "bayern", "hesse", "hessen", "saxony", "sachsen", "lower saxony", "niedersachsen",
     "north rhine westphalia", "nordrhein westfalen", "nrw", "baden württemberg", "thuringia", "thüringen",
+    "schleswig holstein", "saxony anhalt", "sachsen anhalt", "brandenburg", "saarland", "mecklenburg vorpommern",
   ],
   egypt: [
     "cairo", "giza", "alexandria", "new cairo", "nasr city", "maadi", "smart village", "6th of october",
@@ -87,6 +97,17 @@ function conceptAppearsInToken(token: string, concept: string): boolean {
   return token === concept || (concept.length >= 5 && token.includes(concept));
 }
 
+function distinctiveRoleConcepts(phrases: string[]): string[] {
+  return [...new Set(
+    phrases.flatMap((phrase) => normalized(phrase).split(/\s+/).filter((token) => token && !GENERIC_ROLE_TOKENS.has(token))),
+  )];
+}
+
+function titleHasOccupation(title: string): boolean {
+  const tokens = normalized(title).split(/\s+/).filter(Boolean);
+  return tokens.some((token) => ROLE_OCCUPATION_TOKENS.some((occupation) => conceptAppearsInToken(token, occupation)));
+}
+
 function matchesRoleTitle(searchableValue: string, phrases: string[]): boolean {
   if (!phrases.length) return true;
   if (matchesSearchPhrases(searchableValue, phrases)) return true;
@@ -94,16 +115,23 @@ function matchesRoleTitle(searchableValue: string, phrases: string[]): boolean {
   const titleTokens = normalized(searchableValue).split(/\s+/).filter(Boolean);
   if (!titleTokens.length) return false;
 
-  const distinctive = [...new Set(
-    phrases.flatMap((phrase) => normalized(phrase).split(/\s+/).filter((token) => token && !GENERIC_ROLE_TOKENS.has(token))),
-  )];
+  const distinctive = distinctiveRoleConcepts(phrases);
   if (!distinctive.length) return false;
 
   const distinctiveMatches = distinctive.filter((concept) => titleTokens.some((token) => conceptAppearsInToken(token, concept)));
   if (!distinctiveMatches.length) return false;
 
-  const hasOccupation = titleTokens.some((token) => ROLE_OCCUPATION_TOKENS.some((occupation) => conceptAppearsInToken(token, occupation)));
-  return hasOccupation || distinctiveMatches.length >= 2;
+  return titleHasOccupation(searchableValue) || distinctiveMatches.length >= 2;
+}
+
+function matchesRole(job: NormalizedJob, phrases: string[]): boolean {
+  if (matchesRoleTitle(`${job.title} ${job.seniority ?? ""}`, phrases)) return true;
+  if (!phrases.length || !titleHasOccupation(job.title)) return false;
+
+  const distinctive = distinctiveRoleConcepts(phrases);
+  if (!distinctive.length) return false;
+  const context = normalized([job.title, job.description, ...job.skills].filter(Boolean).join(" "));
+  return distinctive.some((concept) => context.split(/\s+/).some((token) => conceptAppearsInToken(token, concept)));
 }
 
 function matchesAny(value: string, candidates: string[]): boolean {
@@ -116,41 +144,70 @@ function discoveryUnknown(job: NormalizedJob, value: string | undefined): boolea
 
 function canonicalCountry(value: string): string {
   const clean = normalized(value);
-  if (["germany", "deutschland", "de"].includes(clean)) return "germany";
-  if (["egypt", "ägypten", "eg"].includes(clean)) return "egypt";
-  if (["united kingdom", "uk", "great britain", "gb"].includes(clean)) return "united kingdom";
-  if (["united states", "usa", "us"].includes(clean)) return "united states";
+  for (const [canonical, aliases] of Object.entries(COUNTRY_ALIASES)) {
+    if (aliases.some((alias) => normalized(alias) === clean)) return canonical;
+  }
   return clean;
+}
+
+function locationMentionsCountry(location: string, canonical: string): boolean {
+  const aliases = COUNTRY_ALIASES[canonical] ?? [canonical];
+  return aliases.filter((alias) => normalized(alias).length > 2).some((alias) => containsPhrase(location, alias));
+}
+
+function detectedCountryFromLocation(location: string | undefined): string | undefined {
+  const value = normalized(location);
+  if (!value) return undefined;
+
+  for (const canonical of Object.keys(COUNTRY_ALIASES)) {
+    if (locationMentionsCountry(value, canonical)) return canonical;
+  }
+  for (const [canonical, hints] of Object.entries(COUNTRY_LOCATION_HINTS)) {
+    if (hints.some((hint) => containsPhrase(value, hint))) return canonical;
+  }
+  return undefined;
+}
+
+function displayCountry(canonical: string | undefined): string | undefined {
+  if (!canonical) return undefined;
+  if (canonical === "germany") return "Germany";
+  if (canonical === "egypt") return "Egypt";
+  if (canonical === "united kingdom") return "United Kingdom";
+  if (canonical === "united states") return "United States";
+  return canonical.charAt(0).toUpperCase() + canonical.slice(1);
 }
 
 function matchesCountryFilter(job: NormalizedJob, countries: string[]): boolean {
   if (!countries.length) return true;
-
+  const targets = countries.map(canonicalCountry);
   const explicitCountry = normalized(job.country);
   const location = normalized(`${job.location ?? ""} ${job.city ?? ""}`);
-  if (!explicitCountry && !location) return job.sourceType === "search-discovery";
 
-  return countries.some((country) => {
-    const canonical = canonicalCountry(country);
-    const aliases = COUNTRY_ALIASES[canonical] ?? [canonical];
-    if (aliases.some((alias) => containsPhrase(explicitCountry, alias) || containsPhrase(location, alias))) return true;
-    return (COUNTRY_LOCATION_HINTS[canonical] ?? []).some((hint) => containsPhrase(location, hint));
-  });
+  if (explicitCountry) {
+    const explicitCanonical = canonicalCountry(explicitCountry);
+    return targets.includes(explicitCanonical)
+      || targets.some((target) => (COUNTRY_ALIASES[target] ?? [target]).some((alias) => normalized(alias) === explicitCountry));
+  }
+
+  const detected = detectedCountryFromLocation(location);
+  if (detected) return targets.includes(detected);
+
+  // Major-board discovery queries are already country-scoped. A public result
+  // frequently exposes only a city (or no location) until the destination page
+  // is opened. Keep it unless we can positively identify a conflicting country.
+  if (job.sourceType === "search-discovery") return true;
+  return false;
 }
 
 function inferredCountryFromLocation(location: string | undefined): string | undefined {
-  const value = normalized(location);
-  if (!value) return undefined;
-  if (COUNTRY_ALIASES.germany.some((alias) => containsPhrase(value, alias)) || COUNTRY_LOCATION_HINTS.germany.some((hint) => containsPhrase(value, hint))) return "Germany";
-  if (COUNTRY_ALIASES.egypt.some((alias) => containsPhrase(value, alias)) || COUNTRY_LOCATION_HINTS.egypt.some((hint) => containsPhrase(value, hint))) return "Egypt";
-  return undefined;
+  return displayCountry(detectedCountryFromLocation(location));
 }
 
 function richerLocation(current: string | undefined, incoming: string | undefined): string | undefined {
   if (!incoming) return current;
   if (!current) return incoming;
-  const currentCountry = inferredCountryFromLocation(current);
-  const incomingCountry = inferredCountryFromLocation(incoming);
+  const currentCountry = detectedCountryFromLocation(current);
+  const incomingCountry = detectedCountryFromLocation(incoming);
   if (!currentCountry && incomingCountry) return incoming;
   if (normalized(incoming).includes(normalized(current)) && incoming.length > current.length) return incoming;
   return current;
@@ -159,7 +216,7 @@ function richerLocation(current: string | undefined, incoming: string | undefine
 type FilterReason = "role" | "keyword" | "location" | "country" | "workplace" | "employment" | "experience" | "company" | "excluded_company" | "provider" | "date" | "salary";
 
 function jobFilterReason(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): FilterReason | undefined {
-  if (!matchesRoleTitle(`${job.title} ${job.seniority ?? ""}`, query.roles)) return "role";
+  if (!matchesRole(job, query.roles)) return "role";
   if (!matchesSearchPhrases([job.title, job.company, job.description, ...job.skills].filter(Boolean).join(" "), query.keywords)) return "keyword";
 
   const location = normalized(`${job.location ?? ""} ${job.city ?? ""} ${job.country ?? ""}`);
@@ -280,7 +337,7 @@ async function enrichDiscoveryJob(job: NormalizedJob): Promise<NormalizedJob> {
     title: page.title ?? job.title,
     company: !hasKnownCompany(job) && page.company ? page.company : job.company,
     location,
-    country: job.country ?? inferredCountryFromLocation(location),
+    country: job.country ?? page.country ?? inferredCountryFromLocation(location),
     description: page.description ?? job.description,
     employmentType: job.employmentType ?? page.employmentType,
     seniority: job.seniority ?? page.seniority,
@@ -295,8 +352,8 @@ async function enrichRelevantUndatedDiscoveryJobs(
 ): Promise<NormalizedJob[]> {
   if (query.postedWithinHours === undefined || !jobs.length) return jobs;
 
-  // Search snippets are often incomplete. Do not reject an otherwise relevant
-  // discovery row for missing location/country/metadata before opening its public job page.
+  // Search snippets are often incomplete. Do not reject a plausible discovery
+  // row for missing location/country/structured metadata before opening the job page.
   const preMetadataQuery: JobSearchQuery = {
     ...query,
     keywords: [],

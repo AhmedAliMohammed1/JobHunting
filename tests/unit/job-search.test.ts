@@ -49,6 +49,48 @@ describe("job search result filtering", () => {
     expect(jobMatchesQuery(analyst, query({ roles: ["Data Analyst"], keywords: ["TypeScript"] }), now)).toBe(true);
   });
 
+  it("matches German embedded titles against the embedded role family", () => {
+    const embedded = {
+      ...job,
+      provider: "xing",
+      sourceType: "search-discovery" as const,
+      title: "Senior Softwareentwickler Embedded C++",
+      location: "Rellingen",
+      country: undefined,
+      description: "Entwicklung von Embedded Software und Firmware für Echtzeitsysteme.",
+      skills: ["C++", "RTOS"],
+    };
+    expect(jobMatchesQuery(embedded, query({
+      roles: ["Embedded Software Engineer", "Firmware Engineer", "Embedded Systems Engineer"],
+      countries: ["Germany"],
+      postedWithinHours: 72,
+    }), now)).toBe(true);
+  });
+
+  it("keeps a country-scoped discovery job with a city-only location but rejects a known foreign country", () => {
+    const germanDiscovery = {
+      ...job,
+      provider: "stepstone",
+      sourceType: "search-discovery" as const,
+      title: "Embedded Software Engineer",
+      location: "Rellingen",
+      country: undefined,
+    };
+    const swissDiscovery = { ...germanDiscovery, location: "Zürich, Switzerland", country: "Switzerland" };
+    expect(jobMatchesQuery(germanDiscovery, query({ countries: ["Germany"] }), now)).toBe(true);
+    expect(jobMatchesQuery(swissDiscovery, query({ countries: ["Germany"] }), now)).toBe(false);
+  });
+
+  it("accepts a generic engineering title when the job body clearly contains the embedded concept", () => {
+    const embedded = {
+      ...job,
+      title: "C++ Software Engineer",
+      description: "Develop embedded Linux firmware for automotive controllers.",
+      skills: ["C++", "Embedded Linux"],
+    };
+    expect(jobMatchesQuery(embedded, query({ roles: ["Embedded Software Engineer", "Firmware Engineer"] }), now)).toBe(true);
+  });
+
   it("enforces location, workplace, company, employment, and seniority filters", () => {
     expect(jobMatchesQuery(job, query({ locations: ["Berlin"], countries: ["Germany"], workplaceTypes: ["remote"], companies: ["Northstar"], employmentTypes: ["full"], experienceLevels: ["senior"] }), now)).toBe(true);
     expect(jobMatchesQuery(job, query({ locations: ["Berlin"], countries: ["France"] }), now)).toBe(false);

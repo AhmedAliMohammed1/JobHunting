@@ -1,200 +1,335 @@
 {
-  "testedAt": "2026-08-18T00:18:17Z",
+  "testedAt": "2026-08-18T00:19:33Z",
   "query": "Software Engineer Germany last 7 days",
-  "jobCount": 15,
-  "partial": false,
-  "providers": [
-    {
-      "providerId": "arbeitnow",
-      "ok": true,
-      "jobsReturned": 8,
-      "errorCode": null
-    },
-    {
-      "providerId": "remote-ok",
-      "ok": true,
-      "jobsReturned": 0,
-      "errorCode": null
-    },
-    {
-      "providerId": "adzuna",
-      "ok": true,
-      "jobsReturned": 0,
-      "errorCode": null
-    },
-    {
-      "providerId": "jooble",
-      "ok": true,
-      "jobsReturned": 3,
-      "errorCode": null
-    },
-    {
-      "providerId": "web-discovery",
-      "ok": true,
-      "jobsReturned": 5,
-      "errorCode": null
-    }
-  ],
-  "countsBySource": [
-    {
-      "provider": "arbeitnow",
-      "count": 7
-    },
-    {
-      "provider": "jooble",
-      "count": 3
-    },
-    {
-      "provider": "stepstone",
-      "count": 2
-    },
-    {
-      "provider": "xing",
-      "count": 3
-    }
-  ],
-  "firstResults": [
-    {
-      "provider": "jooble",
-      "title": "ClimateTech - Senior Software Engineer - Backend (all genders)",
-      "company": "Global Changer",
-      "location": "Germany",
-      "postedAt": "2026-08-16T00:00:00.0000000",
-      "sourceUrl": "https://jooble.org/jdp/-8668025730149704532"
-    },
-    {
-      "provider": "jooble",
-      "title": "Senior Software Engineer - Remote Startup Beratung",
-      "company": "L21s",
-      "location": "Germany",
-      "postedAt": "2026-08-16T00:00:00.0000000",
-      "sourceUrl": "https://jooble.org/jdp/-4742754538495115712"
-    },
-    {
-      "provider": "jooble",
-      "title": "Senior Softwareentwickler:in Kotlin/Java (full remote möglich)",
-      "company": "zollsoft GmbH",
-      "location": "Germany",
-      "postedAt": "2026-08-16T00:00:00.0000000",
-      "sourceUrl": "https://jooble.org/jdp/-7424894184024017948"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Senior Software Engineer – Data Ingestion & Extraction (m/f/d)",
-      "company": "Certivity",
-      "location": "München - HQ",
-      "postedAt": "2026-08-17T23:09:42.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/certivity/senior-software-engineer-data-ingestion-extraction-munchen-hq-353709"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Senior Software Engineer / AI Enabler (m/f/d)",
-      "company": "autoscout24",
-      "location": null,
-      "postedAt": "2026-08-17T20:56:01.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/autoscout24/senior-software-engineer-ai-enabler-342738"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Software Engineer, Web Development",
-      "company": "Titanom Technologies",
-      "location": "Germering, Germany",
-      "postedAt": "2026-08-17T20:20:39.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/titanom-technologies/software-engineer-web-development-germering-370582"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Senior Software Engineer (m/f/d): AI-Native Development",
-      "company": "Myra",
-      "location": "München",
-      "postedAt": "2026-08-17T20:09:48.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/myra/senior-software-engineer-ai-native-development-munchen-219674"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Senior Software Engineer (m/f/x)",
-      "company": "Eye Security",
-      "location": "Berlin - hybrid",
-      "postedAt": "2026-08-17T17:40:30.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/eye-security/senior-software-engineer-berlin-21104"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Agentic AI Software Engineer",
-      "company": "Machine Learning Reply",
-      "location": "Munich, Bayern, Germany",
-      "postedAt": "2026-08-17T17:30:16.000Z",
-      "sourceUrl": "https://www.arbeitnow.com/jobs/companies/machine-learning-reply/agentic-ai-software-engineer-munich-353000"
-    },
-    {
-      "provider": "xing",
-      "title": "Junior Software Developer Jobs & Stellen - Aug 2026",
-      "company": "Company not supplied",
-      "location": null,
-      "postedAt": null,
-      "sourceUrl": "https://www.xing.com/jobs/t-junior-software-developer"
-    },
-    {
-      "provider": "arbeitnow",
-      "title": "Software Engineer",
-      "company": "Preiswecker",
-      "location": "Berlin",
-      "postedAt": "2026-08-12T06:40:00.000Z",
-      "sourceUrl": "https://www.preiswecker.com/"
-    },
-    {
-      "provider": "stepstone",
-      "title": "Software Engineer - Database Integrations",
-      "company": "Company not supplied",
-      "location": null,
-      "postedAt": null,
-      "sourceUrl": "https://www.stepstone.de/stellenangebote--Software-Engineer-Database-Integrations-Germany-remote-Clickhouse-GmbH--13918811-inline.html"
-    },
-    {
-      "provider": "stepstone",
-      "title": "Senior Software Engineer - JVM Language Clients",
-      "company": "Company not supplied",
-      "location": null,
-      "postedAt": null,
-      "sourceUrl": "https://www.stepstone.de/stellenangebote--Senior-Software-Engineer-JVM-Language-Clients-Germany-remote-Clickhouse-GmbH--13971246-inline.html"
-    },
-    {
-      "provider": "xing",
-      "title": "Software Engineer C++ & Architektur (m/w/d) in Wedel",
-      "company": "Company not supplied",
-      "location": null,
-      "postedAt": null,
-      "sourceUrl": "https://www.xing.com/jobs/wedel-software-engineer-architektur-156898902"
-    },
-    {
-      "provider": "xing",
-      "title": "Software Engineer Jobs & Stellen - Aug 2026",
-      "company": "Company not supplied",
-      "location": null,
-      "postedAt": null,
-      "sourceUrl": "https://www.xing.com/jobs/t-software-engineer"
-    }
-  ],
-  "warnings": [],
-  "disclosure": "15 live listings matched across 5 sources.",
-  "interpretedQuery": {
-    "keywords": [],
-    "roles": [
-      "Software Engineer",
-      "Software Developer",
-      "Softwareentwickler"
+  "all": {
+    "jobCount": 15,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "arbeitnow",
+        "ok": true,
+        "jobsReturned": 8,
+        "errorCode": null
+      },
+      {
+        "providerId": "remote-ok",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      },
+      {
+        "providerId": "adzuna",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      },
+      {
+        "providerId": "jooble",
+        "ok": true,
+        "jobsReturned": 3,
+        "errorCode": null
+      },
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 5,
+        "errorCode": null
+      }
     ],
-    "locations": [],
-    "countries": [
-      "Germany"
+    "countsBySource": [
+      {
+        "provider": "arbeitnow",
+        "count": 7
+      },
+      {
+        "provider": "jooble",
+        "count": 3
+      },
+      {
+        "provider": "stepstone",
+        "count": 2
+      },
+      {
+        "provider": "xing",
+        "count": 3
+      }
     ],
-    "employmentTypes": [],
-    "workplaceTypes": [],
-    "experienceLevels": [],
-    "companies": [],
-    "excludedCompanies": [],
-    "providers": [],
-    "postedWithinHours": 168,
-    "limit": 50
+    "jobs": [
+      {
+        "provider": "jooble",
+        "title": "ClimateTech - Senior Software Engineer - Backend (all genders)",
+        "company": "Global Changer",
+        "location": "Germany",
+        "postedAt": "2026-08-16T00:00:00.0000000",
+        "sourceUrl": "https://jooble.org/jdp/-8668025730149704532"
+      },
+      {
+        "provider": "jooble",
+        "title": "Senior Software Engineer - Remote Startup Beratung",
+        "company": "L21s",
+        "location": "Germany",
+        "postedAt": "2026-08-16T00:00:00.0000000",
+        "sourceUrl": "https://jooble.org/jdp/-4742754538495115712"
+      },
+      {
+        "provider": "jooble",
+        "title": "Senior Softwareentwickler:in Kotlin/Java (full remote möglich)",
+        "company": "zollsoft GmbH",
+        "location": "Germany",
+        "postedAt": "2026-08-16T00:00:00.0000000",
+        "sourceUrl": "https://jooble.org/jdp/-7424894184024017948"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Senior Software Engineer – Data Ingestion & Extraction (m/f/d)",
+        "company": "Certivity",
+        "location": "München - HQ",
+        "postedAt": "2026-08-17T23:09:42.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/certivity/senior-software-engineer-data-ingestion-extraction-munchen-hq-353709"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Senior Software Engineer / AI Enabler (m/f/d)",
+        "company": "autoscout24",
+        "location": null,
+        "postedAt": "2026-08-17T20:56:01.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/autoscout24/senior-software-engineer-ai-enabler-342738"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Software Engineer, Web Development",
+        "company": "Titanom Technologies",
+        "location": "Germering, Germany",
+        "postedAt": "2026-08-17T20:20:39.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/titanom-technologies/software-engineer-web-development-germering-370582"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Senior Software Engineer (m/f/d): AI-Native Development",
+        "company": "Myra",
+        "location": "München",
+        "postedAt": "2026-08-17T20:09:48.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/myra/senior-software-engineer-ai-native-development-munchen-219674"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Senior Software Engineer (m/f/x)",
+        "company": "Eye Security",
+        "location": "Berlin - hybrid",
+        "postedAt": "2026-08-17T17:40:30.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/eye-security/senior-software-engineer-berlin-21104"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Agentic AI Software Engineer",
+        "company": "Machine Learning Reply",
+        "location": "Munich, Bayern, Germany",
+        "postedAt": "2026-08-17T17:30:16.000Z",
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/machine-learning-reply/agentic-ai-software-engineer-munich-353000"
+      },
+      {
+        "provider": "xing",
+        "title": "Junior Software Developer Jobs & Stellen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/t-junior-software-developer"
+      },
+      {
+        "provider": "arbeitnow",
+        "title": "Software Engineer",
+        "company": "Preiswecker",
+        "location": "Berlin",
+        "postedAt": "2026-08-12T06:40:00.000Z",
+        "sourceUrl": "https://www.preiswecker.com/"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Software Engineer - Database Integrations",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Software-Engineer-Database-Integrations-Germany-remote-Clickhouse-GmbH--13918811-inline.html"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Senior Software Engineer - JVM Language Clients",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Senior-Software-Engineer-JVM-Language-Clients-Germany-remote-Clickhouse-GmbH--13971246-inline.html"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Engineer C++ & Architektur (m/w/d) in Wedel",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/wedel-software-engineer-architektur-156898902"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Engineer Jobs & Stellen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/t-software-engineer"
+      }
+    ]
+  },
+  "linkedin": {
+    "jobCount": 0,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "jobs": []
+  },
+  "indeed": {
+    "jobCount": 0,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "jobs": []
+  },
+  "xing": {
+    "jobCount": 7,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 7,
+        "errorCode": null
+      }
+    ],
+    "jobs": [
+      {
+        "provider": "xing",
+        "title": "Software Developer C# / .NET (m/w/x) in Ingolstadt | XING Jobs",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/ingolstadt-software-developer-net-156687668"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Engineer Jobs in Uetersen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/software-engineer-jobs-in-uetersen"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Developer Jobs & Stellen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/t-software-developer"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Engineer Jobs in Schrobenhausen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/software-engineer-jobs-in-schrobenhausen"
+      },
+      {
+        "provider": "xing",
+        "title": "Principal Developer, Java Backend with Angular Software/System Architecture Stuttgart Germany Relocation friendly in Stuttgart | XING Jobs",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/stuttgart-principal-developer-java-backend-angular-software-system-architecture-stuttgart-germany-relocation-friendly-156946961"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Developer & Tester (m/w/x) Avionics Systems in Donauwörth | XING Jobs",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/donauwoerth-software-developer-tester-avionics-systems-156692322"
+      },
+      {
+        "provider": "xing",
+        "title": "Software Engineer Jobs & Stellen - Aug 2026",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.xing.com/jobs/t-software-engineer"
+      }
+    ]
+  },
+  "stepstone": {
+    "jobCount": 4,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 4,
+        "errorCode": null
+      }
+    ],
+    "jobs": [
+      {
+        "provider": "stepstone",
+        "title": "GERMANY: Software developer C# for IT automation solutions (m/f/d) in an international R&D team - Job bei der Firma EROWA Software Services GmbH in Germany",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--GERMANY-Software-developer-C-for-IT-automation-solutions-m-f-d-in-an-international-RD-team-Germany-EROWA-Software-Services-GmbH--12554223-inline.html"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Software Engineer (Security) - Full Time - Job bei der Firma Noelscher Consulting GmbH in Ulm, Germany",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--software-engineer-security-full-time-ulm-germany-noelscher-consulting-gmbh--12390572-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Embedded Software Engineer (m/f/d) - Job bei der Firma Novanta in Berlin, Germany",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Embedded-Software-Engineer-m-f-d-Berlin-Germany-Novanta--13418595-inline.html"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Cloud Software Engineer – Adobe Cloud Platform - Job bei der Firma Adobe Systems Europe Limited in Hamburg, Hamburg, Germany",
+        "company": "Company not supplied",
+        "location": null,
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--cloud-software-engineer-adobe-cloud-platform-hamburg-hamburg-germany-adobe-systems-europe-limited--13771971-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP"
+      }
+    ]
+  },
+  "glassdoor": {
+    "jobCount": 0,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "jobs": []
   }
 }

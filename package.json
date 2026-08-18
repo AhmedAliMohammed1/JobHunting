@@ -8,7 +8,7 @@
   "packageManager": "npm@11.5.2",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run lint && npm run typecheck && npm run worker:check && env -u NEXT_PUBLIC_SUPABASE_URL -u NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY -u SUPABASE_SECRET_KEY -u ADZUNA_APP_ID -u ADZUNA_APP_KEY -u JOOBLE_API_KEY -u TAVILY_API_KEY -u SERPER_API_KEY -u JOB_CAREER_SOURCES_JSON NODE_ENV=test npm test && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -28,7 +28,7 @@
     "lucide-react": "^0.539.0",
     "next": "^16.3.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react-dom": "^19.2.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -37,8 +37,8 @@
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "9.39.4",
     "eslint-plugin-jsx-a11y": "6.10.2",

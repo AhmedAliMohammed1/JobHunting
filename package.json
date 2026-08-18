@@ -8,7 +8,7 @@
   "packageManager": "npm@11.5.2",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run lint && npm run typecheck && npm run worker:check && env -u NEXT_PUBLIC_SUPABASE_URL -u NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY -u SUPABASE_SECRET_KEY -u ADZUNA_APP_ID -u ADZUNA_APP_KEY -u JOOBLE_API_KEY -u TAVILY_API_KEY -u BRAVE_SEARCH_API_KEY -u JOB_CAREER_SOURCES_JSON npm test && next build",
+    "build": "npm run lint && npm run typecheck && npm run worker:check && env NODE_ENV=test -u NEXT_PUBLIC_SUPABASE_URL -u NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY -u SUPABASE_SECRET_KEY -u ADZUNA_APP_ID -u ADZUNA_APP_KEY -u JOOBLE_API_KEY -u TAVILY_API_KEY -u BRAVE_SEARCH_API_KEY -u JOB_CAREER_SOURCES_JSON npm test && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -38,6 +38,13 @@ const SOURCE_DOMAINS: Record<Exclude<DiscoverySourceId, "career-page">, string[]
   "sap-successfactors": ["successfactors.com"],
 };
 
+const SOURCE_SEARCH_LABELS: Partial<Record<DiscoverySourceId, string>> = {
+  linkedin: "LinkedIn Jobs",
+  indeed: "Indeed Jobs",
+  xing: "XING Jobs",
+  glassdoor: "Glassdoor Jobs",
+};
+
 const ATS_HOSTS: Array<[RegExp, DiscoverySourceId]> = [
   [/(?:job-boards\.)?greenhouse\.io$/i, "greenhouse"],
   [/jobs\.lever\.co$/i, "lever"],
@@ -78,6 +85,17 @@ interface DiscoveryGroup {
   domains?: string[];
 }
 
+interface DiscoveryQueryInput {
+  source?: DiscoverySourceId;
+  roles: string[];
+  keywords: string[];
+  locations: string[];
+  countries: string[];
+  employmentTypes: string[];
+  workplaceTypes: WorkplaceType[];
+  companies: string[];
+}
+
 export interface SearchDiscoveryProvider {
   id: string;
   search(query: string, options: DiscoveryOptions, signal?: AbortSignal): Promise<DiscoveryResult[]>;
@@ -85,6 +103,7 @@ export interface SearchDiscoveryProvider {
 
 const cache = new Map<string, { expiresAt: number; value: DiscoveryResult[] }>();
 const ADVANCED_DISCOVERY_SOURCES = new Set<DiscoverySourceId>(["linkedin", "indeed", "glassdoor"]);
+const FALLBACK_DISCOVERY_SOURCES = new Set<DiscoverySourceId>(["linkedin", "indeed", "xing", "glassdoor"]);
 
 function cacheKey(query: string, options: DiscoveryOptions): string {
   return createHash("sha256").update(JSON.stringify([query, options])).digest("hex");
@@ -153,49 +172,32 @@ function employmentTerms(types: string[]): string[] {
   return [...terms];
 }
 
-function recencyText(hours: number | undefined): string {
-  if (!hours) return "";
-  if (hours <= 24) return "posted today recent";
-  const days = Math.max(1, Math.ceil(hours / 24));
-  return `posted in the last ${days} days recent`;
-}
-
-export function buildSearchQuery(input: {
-  source?: DiscoverySourceId;
-  roles: string[];
-  keywords: string[];
-  locations: string[];
-  countries: string[];
-  employmentTypes: string[];
-  workplaceTypes: WorkplaceType[];
-  companies: string[];
-  postedWithinHours?: number;
-}): string {
+export function buildSearchQuery(input: DiscoveryQueryInput): string {
   const roleTerms = quoted([...input.roles, ...input.keywords].slice(0, 8));
   const locations = quoted([...input.locations, ...input.countries].slice(0, 6));
   const employment = quoted(employmentTerms(input.employmentTypes));
   const workplaces = quoted(input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type));
   const companies = quoted(input.companies);
-  const pieces = [
-    roleTerms ? `(${roleTerms})` : "jobs",
-    locations ? `(${locations})` : "",
-    employment ? `(${employment})` : "",
-    workplaces ? `(${workplaces})` : "",
-    companies ? `(${companies})` : "",
-    recencyText(input.postedWithinHours),
-  ];
+  const pieces = [roleTerms ? `(${roleTerms})` : "jobs", locations ? `(${locations})` : "", employment ? `(${employment})` : "", workplaces ? `(${workplaces})` : "", companies ? `(${companies})` : ""];
   if (input.source === "career-page") pieces.push("(careers OR jobs OR vacancies OR stellenangebote)");
   return pieces.filter(Boolean).join(" ");
 }
 
-function buildNaturalSearchQuery(input: Parameters<typeof buildSearchQuery>[0]): string {
-  const roleTerms = [...input.roles, ...input.keywords].filter(Boolean).slice(0, 5).join(" ");
+function buildNaturalSearchQuery(input: DiscoveryQueryInput): string {
+  const primaryRole = [input.roles[0], ...input.keywords].filter(Boolean).slice(0, 4).join(" ");
   const locations = [...input.locations, ...input.countries].filter(Boolean).slice(0, 4).join(" ");
-  const employment = employmentTerms(input.employmentTypes).slice(0, 4).join(" ");
+  const employment = employmentTerms(input.employmentTypes).slice(0, 3).join(" ");
   const workplaces = input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type).join(" ");
-  return [roleTerms || "job", "job opening", locations, employment, workplaces, input.companies.join(" "), recencyText(input.postedWithinHours)]
-    .filter(Boolean)
-    .join(" ");
+  return [primaryRole || "job", "job opening", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
+}
+
+function buildSourceFallbackQuery(source: DiscoverySourceId, input: DiscoveryQueryInput): string {
+  const label = SOURCE_SEARCH_LABELS[source] ?? source;
+  const primaryRole = [input.roles[0], ...input.keywords].filter(Boolean).slice(0, 4).join(" ");
+  const locations = [...input.locations, ...input.countries].filter(Boolean).slice(0, 4).join(" ");
+  const employment = employmentTerms(input.employmentTypes).slice(0, 3).join(" ");
+  const workplaces = input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type).join(" ");
+  return [label, primaryRole || "job", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
 }
 
 export function detectATS(url: string): DiscoverySourceId | undefined {
@@ -347,7 +349,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
       const groups = providerGroups(query);
       const perSourceLimit = Math.min(12, Math.max(8, Math.ceil(query.limit / Math.max(1, groups.length))));
       const settled = await Promise.allSettled(groups.map(async (group) => {
-        const input = {
+        const input: DiscoveryQueryInput = {
           source: group.source,
           roles: query.roles,
           keywords: query.keywords,
@@ -356,19 +358,26 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
           employmentTypes: query.employmentTypes,
           workplaceTypes: query.workplaceTypes,
           companies: query.companies,
-          postedWithinHours: query.postedWithinHours,
         };
-        const searchQuery = ADVANCED_DISCOVERY_SOURCES.has(group.source as DiscoverySourceId)
-          ? buildNaturalSearchQuery(input)
-          : buildSearchQuery(input);
-        const searchDepth = ADVANCED_DISCOVERY_SOURCES.has(group.source as DiscoverySourceId) ? "advanced" : "basic";
-
-        const rows = await searchProvider.search(searchQuery, {
+        const advanced = group.source ? ADVANCED_DISCOVERY_SOURCES.has(group.source) : false;
+        const searchQuery = advanced ? buildNaturalSearchQuery(input) : buildSearchQuery(input);
+        const primaryRows = await searchProvider.search(searchQuery, {
           includeDomains: group.domains,
+          postedWithinHours: advanced ? undefined : query.postedWithinHours,
           maxResults: group.source ? 12 : perSourceLimit,
-          searchDepth,
+          searchDepth: advanced ? "advanced" : "basic",
         }, signal);
-        return rows.filter((result) => validDiscoveryResult(result, group.source));
+
+        let validRows = primaryRows.filter((result) => validDiscoveryResult(result, group.source));
+        if (!validRows.length && group.source && FALLBACK_DISCOVERY_SOURCES.has(group.source)) {
+          const fallbackRows = await searchProvider.search(buildSourceFallbackQuery(group.source, input), {
+            postedWithinHours: group.source === "xing" ? query.postedWithinHours : undefined,
+            maxResults: 12,
+            searchDepth: advanced ? "advanced" : "basic",
+          }, signal);
+          validRows = fallbackRows.filter((result) => validDiscoveryResult(result, group.source));
+        }
+        return validRows;
       }));
       if (settled.every((result) => result.status === "rejected")) throw new Error("All discovery searches failed");
       const rows = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);

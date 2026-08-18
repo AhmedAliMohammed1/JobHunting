@@ -73,8 +73,16 @@ export class OpenAICompatibleProvider implements AIProvider {
     return payload;
   }
 
+  private isOpenRouter() {
+    try {
+      return new URL(this.configuration.baseUrl).hostname === "openrouter.ai";
+    } catch {
+      return false;
+    }
+  }
+
   async generateStructured<T>(prompt: string, schema: unknown, schemaName = "jobhunter_result"): Promise<T> {
-    const payload = await this.request<ChatCompletionResponse>("/chat/completions", {
+    const requestBody: Record<string, unknown> = {
       model: this.configuration.model,
       messages: [
         { role: "system", content: "Return only truthful information supported by the supplied context. Unknown facts must be null or UNKNOWN." },
@@ -84,7 +92,11 @@ export class OpenAICompatibleProvider implements AIProvider {
         type: "json_schema",
         json_schema: { name: schemaName, strict: true, schema },
       },
-    });
+    };
+
+    if (this.isOpenRouter()) requestBody.provider = { require_parameters: true };
+
+    const payload = await this.request<ChatCompletionResponse>("/chat/completions", requestBody);
     const content = payload.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI provider returned no structured content.");
     return JSON.parse(content) as T;
@@ -115,4 +127,3 @@ export function getAIProvider(): AIProvider {
   }
   return new NotConfiguredAIProvider();
 }
-

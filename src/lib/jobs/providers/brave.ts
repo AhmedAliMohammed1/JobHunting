@@ -59,9 +59,9 @@ export function createBraveSearchProvider(apiKey: string, cacheTtlSeconds = 600)
         q: withSiteOperators(query, options.includeDomains),
         count: String(Math.min(20, Math.max(1, options.maxResults ?? 12))),
         safesearch: "moderate",
-        spellcheck: "1",
+        spellcheck: "true",
         result_filter: "web",
-        text_decorations: "0",
+        text_decorations: "false",
       });
       const country = countryForQuery(query);
       if (country) params.set("country", country);
@@ -83,7 +83,7 @@ export function createBraveSearchProvider(apiKey: string, cacheTtlSeconds = 600)
       const value = (parsed.web?.results ?? []).map((result) => ({
         title: result.title,
         url: result.url,
-        content: [result.description ?? "", ...(result.extra_snippets ?? []), result.age ? `${result.age} ago` : ""]
+        content: [result.description ?? "", ...(result.extra_snippets ?? []), result.age ?? ""]
           .filter(Boolean)
           .join(" "),
       }));

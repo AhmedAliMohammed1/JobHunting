@@ -20,15 +20,38 @@ JobHunter AI is a privacy-first job discovery, matching, and application-prepara
 
 Requirements: Node.js 22.13 or newer and npm 11.
 
+### Recommended: use the same environment values as Vercel production
+
+```bash
+npm install
+npx vercel login
+npm run setup:local
+npm run dev
+```
+
+`npm run setup:local` links this checkout to the existing Vercel `job-hunting` project and pulls the current **production** environment variables into `.env.local`.
+
+`.env.local` is intentionally gitignored and must never be committed. If an API key changes in Vercel later, refresh your local copy with:
+
+```bash
+npm run env:pull
+```
+
+Then restart `npm run dev`.
+
+Open `http://localhost:3000`.
+
+### Alternative: local fixture mode without production credentials
+
 ```bash
 cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. With the default environment, the app runs in a clearly labeled local-fixture mode. Authenticated persistence, private uploads, RLS, and pgvector require a Supabase project.
+With the example environment, the app can run in local/mock mode. Authenticated persistence, private uploads, RLS, live external job APIs, and production search discovery require the relevant credentials.
 
-To configure Supabase:
+To configure Supabase manually:
 
 1. Create a project and enable Email and Google providers as needed.
 2. Apply `supabase/migrations/20260817180000_initial_schema.sql` with the Supabase CLI or SQL editor.
@@ -39,6 +62,8 @@ To configure Supabase:
 ## Commands
 
 ```bash
+npm run setup:local
+npm run env:pull
 npm run lint
 npm run typecheck
 npm test
@@ -62,7 +87,7 @@ npm start
 - Production always enforces live-provider mode; fixtures are never mixed into production responses. `JOB_PROVIDER_MODE=mock` remains available for local development and automated tests.
 - Arbeitnow is enabled by default, cached for one hour, attributed on every result, and aggregates listings from multiple public ATS sources. Remotive is opt-in because its public-feed terms and 24-hour delay require a separate deployment review.
 - Keep `FEATURE_AUTO_APPLY=false` until the simulation, adapter, queue, secrets, and monitoring gates in the runbook pass.
-- Never expose `SUPABASE_SECRET_KEY`, worker secrets, AI keys, or cron secrets to `NEXT_PUBLIC_*` variables.
+- Never expose `SUPABASE_SECRET_KEY`, worker secrets, AI keys, job-provider API keys, OAuth secrets, or cron secrets in Git-tracked files or `NEXT_PUBLIC_*` variables.
 - Deploy the web application to Vercel and the stateful Playwright worker to a separate container service.
 
 ## Documentation

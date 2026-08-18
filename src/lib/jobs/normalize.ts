@@ -23,15 +23,24 @@ export function inferWorkplaceType(...values: Array<string | undefined>): Workpl
   return "unknown";
 }
 
+function containsKnownSkill(text: string, skill: string): boolean {
+  const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(text);
+}
+
 export function inferSkills(text: string | undefined): string[] {
   if (!text) return [];
   const known = [
     "JavaScript", "TypeScript", "React", "Next.js", "Node.js", "Python", "Java",
-    "C#", ".NET", "Go", "Rust", "C++", "AWS", "Azure", "GCP", "Docker", "Kubernetes",
-    "PostgreSQL", "SQL", "GraphQL", "REST", "Terraform", "Figma", "Git",
+    "C#", ".NET", "Go", "Rust", "C++", "Embedded C", "C", "AWS", "Azure", "GCP", "Docker", "Kubernetes",
+    "PostgreSQL", "SQL", "GraphQL", "REST", "Terraform", "Figma", "Git", "Linux",
     "Machine Learning", "AI", "LLM", "NLP", "PyTorch", "TensorFlow", "Computer Vision",
+    "RTOS", "FreeRTOS", "Bare-Metal", "STM32", "ARM Cortex-M", "UART", "SPI", "I2C", "CAN", "CANoe",
+    "AUTOSAR", "ROS 2", "Squish", "MATLAB", "Simulink", "Altium Designer", "Cadence Allegro", "PCB Design",
+    "Sensor Validation", "Environmental Testing", "Data Acquisition", "Regression Testing", "Hardware Debugging",
+    "Board Bring-Up", "CUDA", "ONNX Runtime", "YOLOv8", "RViz",
   ];
-  return known.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text));
+  return known.filter((skill) => containsKnownSkill(text, skill));
 }
 
 export function inferSeniority(...values: Array<string | undefined>): string | undefined {
@@ -84,8 +93,6 @@ export function normalizedJob(input: {
   const description = cleanText(input.description);
   const sourceType = input.sourceType ?? sourceTypeFor(input.provider);
 
-  // Extract metadata from the original indexed URL first; LinkedIn slugs can carry
-  // company information that is intentionally removed from the final stable URL.
   const discoveryMetadata = sourceType === "search-discovery"
     ? inferDiscoveryMetadata({
       provider: input.provider,

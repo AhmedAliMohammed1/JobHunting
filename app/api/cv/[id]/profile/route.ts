@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/src/lib/auth/user";
 import { getAIProvider } from "@/src/lib/ai/provider";
-import { mergeAuthoritativeProfile, parseCandidateText } from "@/src/lib/ai/candidate-parser";
+import { mergeAuthoritativeProfile, parseCandidateText, type CandidateProfileExtraction } from "@/src/lib/ai/candidate-parser";
 import { createClient } from "@/src/lib/database/supabase/server";
 import { idSchema } from "@/src/lib/validation/product";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
-const manualFieldMap: Record<string, string> = {
+const manualFieldMap: Record<string, keyof CandidateProfileExtraction> = {
   full_name: "fullName",
   current_title: "currentTitle",
   location: "location",
@@ -27,6 +27,15 @@ function skillNames(value: unknown): string[] {
     if (typeof item === "string") return item.trim() ? [item.trim()] : [];
     if (item && typeof item === "object" && "name" in item && typeof item.name === "string" && item.name.trim()) return [item.name.trim()];
     return [];
+  });
+}
+
+function normalizedLanguages(value: unknown): CandidateProfileExtraction["languages"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || !("name" in item) || typeof item.name !== "string" || !item.name.trim()) return [];
+    const level = "level" in item && typeof item.level === "string" && item.level.trim() ? item.level.trim() : null;
+    return [{ name: item.name.trim(), level }];
   });
 }
 
@@ -76,7 +85,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
     if (profileLoadError) throw new Error("Could not load the existing profile.");
 
-    const current = {
+    const current: CandidateProfileExtraction = {
       fullName: existing?.full_name ?? null,
       currentTitle: existing?.current_title ?? null,
       location: existing?.location ?? null,
@@ -89,12 +98,14 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       employment: [],
       projects: [],
       certifications: existing?.certifications ?? [],
-      languages: Array.isArray(existing?.languages) ? existing.languages : [],
+      languages: normalizedLanguages(existing?.languages),
       yearsExperience: existing?.years_experience == null ? null : Number(existing.years_experience),
     };
 
-    const manualFields = (existing?.manual_fields ?? []).map((field: string) => manualFieldMap[field]).filter(Boolean);
+    const manualFields: string[] = (existing?.manual_fields ?? []).flatMap((field: string) => manualFieldMap[field] ? [manualFieldMap[field]] : []);
     const merged = mergeAuthoritativeProfile(current, extracted, manualFields);
+    const preserveManualSkills = manualFields.includes("skills") && current.skills.length > 0;
+    const skillsToSave = preserveManualSkills ? existing?.skills : merged.skills.map((name) => ({ name, source: "cv" }));
 
     const { data: saved, error: saveError } = await supabase.from("candidate_profiles").upsert({
       user_id: user.id,
@@ -102,7 +113,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       current_title: merged.currentTitle,
       location: merged.location,
       summary: merged.summary,
-      skills: merged.skills.map((name) => ({ name, source: "cv" })),
+      skills: skillsToSave,
       programming_languages: merged.programmingLanguages,
       frameworks: merged.frameworks,
       tools: merged.tools,

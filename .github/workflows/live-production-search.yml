@@ -16,28 +16,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Query production search API
+      - name: Query production search API by source
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            -X POST 'https://job-hunting-two-gamma.vercel.app/api/jobs/search' \
-            -H 'content-type: application/json' \
-            --data '{"query":"Software Engineer Germany last 7 days","filters":{"limit":50}}' \
-            -o response.json
+          BASE='https://job-hunting-two-gamma.vercel.app/api/jobs/search'
+          QUERY='Software Engineer Germany last 7 days'
 
-          jq '{
-            testedAt: (now | todateiso8601),
-            query: "Software Engineer Germany last 7 days",
-            jobCount: (.jobs | length),
-            partial,
-            providers: (.providers | map({providerId, ok, jobsReturned, errorCode})),
-            countsBySource: ([.jobs[].provider] | group_by(.) | map({provider: .[0], count: length})),
-            firstResults: (.jobs[:30] | map({provider, title, company, location, postedAt, sourceUrl})),
-            warnings,
-            disclosure,
-            interpretedQuery
-          }' response.json > live-production-search-result.json
+          run_search() {
+            local name="$1"
+            local provider="$2"
+            local filters
+            if [ -n "$provider" ]; then
+              filters=$(jq -nc --arg p "$provider" '{limit:50,providers:[$p]}')
+            else
+              filters='{"limit":50}'
+            fi
+            body=$(jq -nc --arg q "$QUERY" --argjson f "$filters" '{query:$q,filters:$f}')
+            curl --fail-with-body --silent --show-error \
+              -X POST "$BASE" \
+              -H 'content-type: application/json' \
+              --data "$body" \
+              -o "response-$name.json"
+          }
+
+          run_search all ''
+          run_search linkedin linkedin
+          run_search indeed indeed
+          run_search xing xing
+          run_search stepstone stepstone
+          run_search glassdoor glassdoor
+
+          jq -n \
+            --slurpfile all response-all.json \
+            --slurpfile linkedin response-linkedin.json \
+            --slurpfile indeed response-indeed.json \
+            --slurpfile xing response-xing.json \
+            --slurpfile stepstone response-stepstone.json \
+            --slurpfile glassdoor response-glassdoor.json \
+            '{
+              testedAt: (now | todateiso8601),
+              query: "Software Engineer Germany last 7 days",
+              all: ($all[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), countsBySource:([.jobs[].provider]|group_by(.)|map({provider:.[0],count:length})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
+              linkedin: ($linkedin[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
+              indeed: ($indeed[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
+              xing: ($xing[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
+              stepstone: ($stepstone[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))}),
+              glassdoor: ($glassdoor[0] | {jobCount:(.jobs|length), partial, providers:(.providers|map({providerId,ok,jobsReturned,errorCode})), jobs:(.jobs|map({provider,title,company,location,postedAt,sourceUrl}))})
+            }' > live-production-search-result.json
 
           cat live-production-search-result.json
 
@@ -49,5 +75,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add live-production-search-result.json
           git diff --cached --quiet && exit 0
-          git commit -m 'test: record live production search result'
+          git commit -m 'test: record live production source probes'
           git push

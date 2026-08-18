@@ -5,6 +5,7 @@ export const candidateProfileSchema = z.object({
   fullName: z.string().min(1).nullable(),
   currentTitle: z.string().min(1).nullable(),
   location: z.string().min(1).nullable(),
+  summary: z.string().min(1).max(4_000).nullable(),
   skills: z.array(z.string().min(1)).max(100),
   programmingLanguages: z.array(z.string().min(1)).max(50),
   frameworks: z.array(z.string().min(1)).max(50),
@@ -17,17 +18,25 @@ export const candidateProfileSchema = z.object({
   yearsExperience: z.number().nonnegative().nullable(),
 });
 
+export type CandidateProfileExtraction = z.infer<typeof candidateProfileSchema>;
+
 const jsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["fullName", "currentTitle", "location", "skills", "programmingLanguages", "frameworks", "tools", "education", "employment", "projects", "certifications", "languages", "yearsExperience"],
+  required: ["fullName", "currentTitle", "location", "summary", "skills", "programmingLanguages", "frameworks", "tools", "education", "employment", "projects", "certifications", "languages", "yearsExperience"],
   properties: {
-    fullName: { type: ["string", "null"] }, currentTitle: { type: ["string", "null"] }, location: { type: ["string", "null"] },
-    skills: { type: "array", items: { type: "string" } }, programmingLanguages: { type: "array", items: { type: "string" } },
-    frameworks: { type: "array", items: { type: "string" } }, tools: { type: "array", items: { type: "string" } },
+    fullName: { type: ["string", "null"] },
+    currentTitle: { type: ["string", "null"] },
+    location: { type: ["string", "null"] },
+    summary: { type: ["string", "null"] },
+    skills: { type: "array", items: { type: "string" } },
+    programmingLanguages: { type: "array", items: { type: "string" } },
+    frameworks: { type: "array", items: { type: "string" } },
+    tools: { type: "array", items: { type: "string" } },
     education: { type: "array", items: { type: "object", additionalProperties: false, required: ["institution", "degree", "field"], properties: { institution: { type: "string" }, degree: { type: ["string", "null"] }, field: { type: ["string", "null"] } } } },
     employment: { type: "array", items: { type: "object", additionalProperties: false, required: ["company", "position", "startDate", "endDate"], properties: { company: { type: "string" }, position: { type: "string" }, startDate: { type: ["string", "null"] }, endDate: { type: ["string", "null"] } } } },
-    projects: { type: "array", items: { type: "string" } }, certifications: { type: "array", items: { type: "string" } },
+    projects: { type: "array", items: { type: "string" } },
+    certifications: { type: "array", items: { type: "string" } },
     languages: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "level"], properties: { name: { type: "string" }, level: { type: ["string", "null"] } } } },
     yearsExperience: { type: ["number", "null"] },
   },
@@ -36,18 +45,34 @@ const jsonSchema = {
 export async function parseCandidateText(provider: AIProvider, cvText: string) {
   if (cvText.length > 120_000) throw new Error("CV text exceeds the safe parsing limit.");
   const result = await provider.generateStructured<unknown>(
-    `Extract only facts explicitly present in this CV. Do not infer visa, nationality, salary, legal, demographic, or work-authorization data.\n\nCV:\n${cvText}`,
+    [
+      "Extract only facts explicitly supported by this CV.",
+      "Do not infer visa, nationality, salary, legal, demographic, or work-authorization data.",
+      "Use the CV's explicit professional Summary section for summary when one exists; otherwise return null.",
+      "Do not calculate yearsExperience from employment dates. Set yearsExperience only when the CV explicitly states a numeric years-of-experience value; otherwise return null.",
+      "Do not invent technologies, dates, employers, degrees, language levels, or titles.",
+      "",
+      "CV:",
+      cvText,
+    ].join("\n"),
     jsonSchema,
     "candidate_profile",
   );
   return candidateProfileSchema.parse(result);
 }
 
+function hasMeaningfulValue(value: unknown) {
+  if (value == null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
 export function mergeAuthoritativeProfile<T extends Record<string, unknown>>(existing: T, extracted: Partial<T>, manualFields: string[]): T {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(extracted)) {
-    if (!manualFields.includes(key) && value !== undefined) merged[key as keyof T] = value as T[keyof T];
+    const preserveManual = manualFields.includes(key) && hasMeaningfulValue(existing[key]);
+    if (!preserveManual && value !== undefined) merged[key as keyof T] = value as T[keyof T];
   }
   return merged;
 }
-

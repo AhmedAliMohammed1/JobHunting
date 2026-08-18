@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "coverage/**",
     "next-env.d.ts",
+    "supabase/functions/**",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

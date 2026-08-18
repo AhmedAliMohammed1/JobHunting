@@ -27,6 +27,17 @@ describe("AI provider adapters", () => {
     expect(JSON.parse(String(options.body)).response_format.json_schema.strict).toBe(true);
   });
 
+  it("requires OpenRouter routes that support requested structured-output parameters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"ok\":true}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/free", embeddingModel: "embed" });
+    await provider.generateStructured("prompt", { type: "object" }, "result");
+    const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(options.body));
+    expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.response_format.type).toBe("json_schema");
+  });
+
   it("surfaces provider errors and missing response data", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "quota" } }), { status: 429 })));
     const provider = new OpenAICompatibleProvider({ apiKey: "secret", baseUrl: "https://api.example", model: "model", embeddingModel: "embed" });

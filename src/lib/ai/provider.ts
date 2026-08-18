@@ -119,9 +119,19 @@ export class OpenAICompatibleProvider implements AIProvider {
     }
   }
 
+  private structuredModel() {
+    // The generic free router can randomly select high-latency reasoning models.
+    // Pin structured extraction to a currently free model that explicitly supports
+    // structured_outputs. Explicitly configured model IDs are always respected.
+    if (this.isOpenRouter() && this.configuration.model === "openrouter/free") {
+      return "google/gemma-4-26b-a4b-it:free";
+    }
+    return this.configuration.model;
+  }
+
   async generateStructured<T>(prompt: string, schema: unknown, schemaName = "jobhunter_result"): Promise<T> {
     const requestBody: Record<string, unknown> = {
-      model: this.configuration.model,
+      model: this.structuredModel(),
       messages: [
         { role: "system", content: "Return only truthful information supported by the supplied context. Never invent unsupported facts. Use null where the schema permits unknown scalar values and empty arrays for unknown list values." },
         { role: "user", content: prompt },
@@ -130,14 +140,14 @@ export class OpenAICompatibleProvider implements AIProvider {
         type: "json_schema",
         json_schema: { name: schemaName, strict: true, schema },
       },
-      max_tokens: 3_000,
+      temperature: 0.1,
+      max_tokens: 2_500,
     };
 
     if (this.isOpenRouter()) {
       requestBody.provider = {
         require_parameters: true,
         allow_fallbacks: true,
-        sort: "latency",
       };
     }
 

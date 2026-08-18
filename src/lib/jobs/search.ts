@@ -22,11 +22,55 @@ const PRIORITY_JOB_SOURCES = new Map<string, number>([
   ["glassdoor", 0.9],
 ]);
 
-const MAX_DISCOVERY_METADATA_ENRICHMENTS = 36;
-const DISCOVERY_METADATA_CONCURRENCY = 8;
+const MAX_DISCOVERY_METADATA_ENRICHMENTS = 50;
+const DISCOVERY_METADATA_CONCURRENCY = 12;
+
+const GENERIC_ROLE_TOKENS = new Set([
+  "engineer", "engineering", "developer", "software", "system", "systems", "specialist", "consultant",
+  "senior", "junior", "lead", "staff", "principal", "manager", "intern", "working", "student",
+]);
+
+const ROLE_OCCUPATION_TOKENS = [
+  "engineer", "developer", "architect", "tester", "specialist", "consultant", "ingenieur", "entwickler",
+  "softwareentwickler", "firmwareentwickler", "entwicklungsingenieur", "testingenieur", "architekt",
+];
+
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  germany: ["germany", "deutschland", "de"],
+  deutschland: ["germany", "deutschland", "de"],
+  de: ["germany", "deutschland", "de"],
+  egypt: ["egypt", "ägypten", "eg"],
+  "ägypten": ["egypt", "ägypten", "eg"],
+  eg: ["egypt", "ägypten", "eg"],
+  "united kingdom": ["united kingdom", "uk", "great britain", "gb"],
+  uk: ["united kingdom", "uk", "great britain", "gb"],
+  "united states": ["united states", "usa", "us"],
+  usa: ["united states", "usa", "us"],
+};
+
+const COUNTRY_LOCATION_HINTS: Record<string, string[]> = {
+  germany: [
+    "berlin", "munich", "münchen", "hamburg", "bremen", "hannover", "frankfurt", "stuttgart", "cologne", "köln",
+    "düsseldorf", "dortmund", "essen", "leipzig", "dresden", "nuremberg", "nürnberg", "erlangen", "ingolstadt",
+    "darmstadt", "ulm", "aachen", "karlsruhe", "regensburg", "potsdam", "mannheim", "heidelberg", "wolfsburg",
+    "braunschweig", "saarbrücken", "jena", "bielefeld", "bochum", "bonn", "würzburg", "mainz", "wiesbaden",
+    "freiburg", "bavaria", "bayern", "hesse", "hessen", "saxony", "sachsen", "lower saxony", "niedersachsen",
+    "north rhine westphalia", "nordrhein westfalen", "nrw", "baden württemberg", "thuringia", "thüringen",
+  ],
+  egypt: [
+    "cairo", "giza", "alexandria", "new cairo", "nasr city", "maadi", "smart village", "6th of october",
+    "sixth of october", "sheikh zayed", "heliopolis",
+  ],
+};
 
 function normalized(value: string | undefined): string {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/[^\p{L}\p{N}+#.]+/gu, " ").replace(/\s+/g, " ").trim() ?? "";
+}
+
+function containsPhrase(value: string, phrase: string): boolean {
+  const needle = normalized(phrase);
+  if (!needle) return false;
+  return ` ${normalized(value)} `.includes(` ${needle} `);
 }
 
 function matchesSearchPhrases(searchableValue: string, phrases: string[]): boolean {
@@ -39,6 +83,29 @@ function matchesSearchPhrases(searchableValue: string, phrases: string[]): boole
   });
 }
 
+function conceptAppearsInToken(token: string, concept: string): boolean {
+  return token === concept || (concept.length >= 5 && token.includes(concept));
+}
+
+function matchesRoleTitle(searchableValue: string, phrases: string[]): boolean {
+  if (!phrases.length) return true;
+  if (matchesSearchPhrases(searchableValue, phrases)) return true;
+
+  const titleTokens = normalized(searchableValue).split(/\s+/).filter(Boolean);
+  if (!titleTokens.length) return false;
+
+  const distinctive = [...new Set(
+    phrases.flatMap((phrase) => normalized(phrase).split(/\s+/).filter((token) => token && !GENERIC_ROLE_TOKENS.has(token))),
+  )];
+  if (!distinctive.length) return false;
+
+  const distinctiveMatches = distinctive.filter((concept) => titleTokens.some((token) => conceptAppearsInToken(token, concept)));
+  if (!distinctiveMatches.length) return false;
+
+  const hasOccupation = titleTokens.some((token) => ROLE_OCCUPATION_TOKENS.some((occupation) => conceptAppearsInToken(token, occupation)));
+  return hasOccupation || distinctiveMatches.length >= 2;
+}
+
 function matchesAny(value: string, candidates: string[]): boolean {
   return !candidates.length || candidates.some((candidate) => value.includes(normalized(candidate)));
 }
@@ -47,41 +114,85 @@ function discoveryUnknown(job: NormalizedJob, value: string | undefined): boolea
   return job.sourceType === "search-discovery" && !normalized(value);
 }
 
-export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): boolean {
-  if (!matchesSearchPhrases(`${job.title} ${job.seniority ?? ""}`, query.roles)) return false;
-  if (!matchesSearchPhrases([job.title, job.company, job.description, ...job.skills].filter(Boolean).join(" "), query.keywords)) return false;
+function canonicalCountry(value: string): string {
+  const clean = normalized(value);
+  if (["germany", "deutschland", "de"].includes(clean)) return "germany";
+  if (["egypt", "ägypten", "eg"].includes(clean)) return "egypt";
+  if (["united kingdom", "uk", "great britain", "gb"].includes(clean)) return "united kingdom";
+  if (["united states", "usa", "us"].includes(clean)) return "united states";
+  return clean;
+}
+
+function matchesCountryFilter(job: NormalizedJob, countries: string[]): boolean {
+  if (!countries.length) return true;
+
+  const explicitCountry = normalized(job.country);
+  const location = normalized(`${job.location ?? ""} ${job.city ?? ""}`);
+  if (!explicitCountry && !location) return job.sourceType === "search-discovery";
+
+  return countries.some((country) => {
+    const canonical = canonicalCountry(country);
+    const aliases = COUNTRY_ALIASES[canonical] ?? [canonical];
+    if (aliases.some((alias) => containsPhrase(explicitCountry, alias) || containsPhrase(location, alias))) return true;
+    return (COUNTRY_LOCATION_HINTS[canonical] ?? []).some((hint) => containsPhrase(location, hint));
+  });
+}
+
+function inferredCountryFromLocation(location: string | undefined): string | undefined {
+  const value = normalized(location);
+  if (!value) return undefined;
+  if (COUNTRY_ALIASES.germany.some((alias) => containsPhrase(value, alias)) || COUNTRY_LOCATION_HINTS.germany.some((hint) => containsPhrase(value, hint))) return "Germany";
+  if (COUNTRY_ALIASES.egypt.some((alias) => containsPhrase(value, alias)) || COUNTRY_LOCATION_HINTS.egypt.some((hint) => containsPhrase(value, hint))) return "Egypt";
+  return undefined;
+}
+
+function richerLocation(current: string | undefined, incoming: string | undefined): string | undefined {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  const currentCountry = inferredCountryFromLocation(current);
+  const incomingCountry = inferredCountryFromLocation(incoming);
+  if (!currentCountry && incomingCountry) return incoming;
+  if (normalized(incoming).includes(normalized(current)) && incoming.length > current.length) return incoming;
+  return current;
+}
+
+type FilterReason = "role" | "keyword" | "location" | "country" | "workplace" | "employment" | "experience" | "company" | "excluded_company" | "provider" | "date" | "salary";
+
+function jobFilterReason(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): FilterReason | undefined {
+  if (!matchesRoleTitle(`${job.title} ${job.seniority ?? ""}`, query.roles)) return "role";
+  if (!matchesSearchPhrases([job.title, job.company, job.description, ...job.skills].filter(Boolean).join(" "), query.keywords)) return "keyword";
 
   const location = normalized(`${job.location ?? ""} ${job.city ?? ""} ${job.country ?? ""}`);
-  if (query.locations.length && !location && job.sourceType !== "search-discovery") return false;
-  if (location && !matchesAny(location, query.locations)) return false;
-  const country = normalized(`${job.country ?? ""} ${job.location ?? ""}`);
-  if (query.countries.length && !country && job.sourceType !== "search-discovery") return false;
-  if (country && !matchesAny(country, query.countries)) return false;
+  if (query.locations.length && !location && job.sourceType !== "search-discovery") return "location";
+  if (location && !matchesAny(location, query.locations)) return "location";
+  if (!matchesCountryFilter(job, query.countries)) return "country";
 
-  if (query.workplaceTypes.length && !(job.workplaceType === "unknown" && job.sourceType === "search-discovery") && !query.workplaceTypes.includes(job.workplaceType)) return false;
-  if (!discoveryUnknown(job, job.employmentType) && !matchesAny(normalized(job.employmentType), query.employmentTypes)) return false;
-  if (!discoveryUnknown(job, job.seniority) && !matchesAny(normalized(job.seniority), query.experienceLevels)) return false;
+  if (query.workplaceTypes.length && !(job.workplaceType === "unknown" && job.sourceType === "search-discovery") && !query.workplaceTypes.includes(job.workplaceType)) return "workplace";
+  if (!discoveryUnknown(job, job.employmentType) && !matchesAny(normalized(job.employmentType), query.employmentTypes)) return "employment";
+  if (!discoveryUnknown(job, job.seniority) && !matchesAny(normalized(job.seniority), query.experienceLevels)) return "experience";
   const companyKnown = !/^(?:company not supplied|unknown company)$/i.test(job.company);
-  if (query.companies.length && companyKnown && !matchesAny(normalized(job.company), query.companies)) return false;
-  if (query.companies.length && !companyKnown && job.sourceType !== "search-discovery") return false;
-  if (query.excludedCompanies.some((company) => normalized(job.company).includes(normalized(company)))) return false;
-  if (query.providers.length && !query.providers.includes(job.provider)) return false;
+  if (query.companies.length && companyKnown && !matchesAny(normalized(job.company), query.companies)) return "company";
+  if (query.companies.length && !companyKnown && job.sourceType !== "search-discovery") return "company";
+  if (query.excludedCompanies.some((company) => normalized(job.company).includes(normalized(company)))) return "excluded_company";
+  if (query.providers.length && !query.providers.includes(job.provider)) return "provider";
 
   if (query.postedWithinHours !== undefined) {
     const postedAt = job.postedAt ? Date.parse(job.postedAt) : Number.NaN;
     const oldestAllowed = now - query.postedWithinHours * 60 * 60 * 1_000;
-    // Freshness filters are strict. Search-engine recency is only a retrieval hint;
-    // a listing must expose a verifiable posting date before it can pass 24h/72h/etc.
-    if (!Number.isFinite(postedAt)) return false;
-    if (postedAt < oldestAllowed || postedAt > now + 5 * 60 * 1_000) return false;
+    if (!Number.isFinite(postedAt)) return "date";
+    if (postedAt < oldestAllowed || postedAt > now + 5 * 60 * 1_000) return "date";
   }
 
   if (query.minimumSalary !== undefined) {
     const highestKnownSalary = job.salaryMax ?? job.salaryMin;
-    if (highestKnownSalary === undefined || highestKnownSalary < query.minimumSalary) return false;
+    if (highestKnownSalary === undefined || highestKnownSalary < query.minimumSalary) return "salary";
   }
 
-  return true;
+  return undefined;
+}
+
+export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now = Date.now()): boolean {
+  return jobFilterReason(job, query, now) === undefined;
 }
 
 function lexicalScore(job: NormalizedJob, query: JobSearchQuery): number {
@@ -162,12 +273,14 @@ async function enrichDiscoveryJob(job: NormalizedJob): Promise<NormalizedJob> {
   const page = await fetchPublicJobPageMetadata(url);
   if (page.dead) return job;
   const parsedPostedAt = page.datePosted ? Date.parse(page.datePosted) : Number.NaN;
+  const location = richerLocation(job.location, page.location);
 
   return {
     ...job,
     title: page.title ?? job.title,
     company: !hasKnownCompany(job) && page.company ? page.company : job.company,
-    location: job.location ?? page.location,
+    location,
+    country: job.country ?? inferredCountryFromLocation(location),
     description: page.description ?? job.description,
     employmentType: job.employmentType ?? page.employmentType,
     seniority: job.seniority ?? page.seniority,
@@ -182,10 +295,22 @@ async function enrichRelevantUndatedDiscoveryJobs(
 ): Promise<NormalizedJob[]> {
   if (query.postedWithinHours === undefined || !jobs.length) return jobs;
 
-  const withoutRecency = { ...query, postedWithinHours: undefined };
+  // Search snippets are often incomplete. Do not reject an otherwise relevant
+  // discovery row for missing location/country/metadata before opening its public job page.
+  const preMetadataQuery: JobSearchQuery = {
+    ...query,
+    keywords: [],
+    locations: [],
+    countries: [],
+    workplaceTypes: [],
+    employmentTypes: [],
+    experienceLevels: [],
+    postedWithinHours: undefined,
+    minimumSalary: undefined,
+  };
   const indexes = jobs
     .map((job, index) => ({ job, index }))
-    .filter(({ job }) => job.sourceType === "search-discovery" && !hasVerifiablePostedAt(job) && jobMatchesQuery(job, withoutRecency, now))
+    .filter(({ job }) => job.sourceType === "search-discovery" && !hasVerifiablePostedAt(job) && jobMatchesQuery(job, preMetadataQuery, now))
     .slice(0, MAX_DISCOVERY_METADATA_ENRICHMENTS);
 
   if (!indexes.length) return jobs;
@@ -209,6 +334,13 @@ async function enrichRelevantUndatedDiscoveryJobs(
   });
 
   return copy;
+}
+
+function breakdownBySource(jobs: NormalizedJob[]): Record<string, number> {
+  return jobs.reduce<Record<string, number>>((counts, job) => {
+    counts[job.provider] = (counts[job.provider] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearchResult> {
@@ -238,15 +370,25 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
   }));
 
   const filteredResults = enrichedResults.map((result) => {
-    const jobs = result.jobs.filter((job) => jobMatchesQuery(job, query, now));
+    const rejectionCounts: Partial<Record<FilterReason, number>> = {};
+    const jobs = result.jobs.filter((job) => {
+      const reason = jobFilterReason(job, query, now);
+      if (reason) rejectionCounts[reason] = (rejectionCounts[reason] ?? 0) + 1;
+      return !reason;
+    });
+
+    if (result.providerId === "web-discovery") {
+      log("info", "job_discovery_filter_diagnostics", {
+        rawBySource: JSON.stringify(breakdownBySource(result.jobs)),
+        keptBySource: JSON.stringify(breakdownBySource(jobs)),
+        rejectedByReason: JSON.stringify(rejectionCounts),
+      });
+    }
     return { ...result, jobs, health: { ...result.health, jobsReturned: jobs.length } };
   });
   const deduplicated = deduplicateJobs(filteredResults.flatMap((result) => result.jobs)).map((job) => withFreshness(job));
   const ranked = rankWithoutProfile(deduplicated, query);
-  const sourceBreakdown = ranked.reduce<Record<string, number>>((counts, job) => {
-    counts[job.provider] = (counts[job.provider] ?? 0) + 1;
-    return counts;
-  }, {});
+  const sourceBreakdown = breakdownBySource(ranked);
   const jobs = ranked.slice(0, query.limit);
 
   log("info", "job_search_completed", {

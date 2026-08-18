@@ -1,8 +1,8 @@
 {
-  "testedAt": "2026-08-18T00:23:50Z",
+  "testedAt": "2026-08-18T00:27:35Z",
   "query": "Software Engineer Germany last 7 days",
   "all": {
-    "jobCount": 14,
+    "jobCount": 43,
     "partial": false,
     "providers": [
       {
@@ -20,7 +20,7 @@
       {
         "providerId": "adzuna",
         "ok": true,
-        "jobsReturned": 0,
+        "jobsReturned": 32,
         "errorCode": null
       },
       {
@@ -32,56 +32,268 @@
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 4,
+        "jobsReturned": 3,
         "errorCode": null
       }
     ],
     "countsBySource": [
       {
-        "provider": "arbeitnow",
-        "count": 7
+        "provider": "adzuna",
+        "count": 30
       },
       {
-        "provider": "career-page",
-        "count": 1
+        "provider": "arbeitnow",
+        "count": 7
       },
       {
         "provider": "jooble",
         "count": 3
       },
       {
-        "provider": "linkedin",
-        "count": 1
-      },
-      {
         "provider": "stepstone",
-        "count": 2
+        "count": 3
       }
     ],
     "jobs": [
       {
-        "provider": "linkedin",
-        "title": "Software Developer",
-        "company": "Achievers Network",
-        "location": "Aug, Bavaria, Germany",
-        "postedAt": null,
-        "sourceUrl": "https://www.linkedin.com/jobs/view/software-developer-at-achievers-network-4320912450?refId=I%2F1bxCsXXQOd8aTaD2fJvQ%3D%3D&trackingId=tqk%2F%2Bq%2BJlPe7Ta6rJFBwxg%3D%3D"
+        "provider": "adzuna",
+        "title": "Software Engineer - Middleware (w/m/d) (Softwareentwickler/in)",
+        "company": "SIV.AG - Service für Informationsverarbeitung AG",
+        "location": "Rostock, Mecklenburg-Vorpommern",
+        "postedAt": "2026-08-17T22:53:35Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845429916?utm_medium=api&utm_source=1c857c72"
       },
       {
-        "provider": "stepstone",
-        "title": "GERMANY: Software developer C# for IT automation solutions (m/f/d) in an international R&D team",
-        "company": "EROWA Software Services GmbH",
-        "location": "Germany",
-        "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--GERMANY-Software-developer-C-for-IT-automation-solutions-m-f-d-in-an-international-RD-team-Germany-EROWA-Software-Services-GmbH--12554223-inline.html"
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Potsdam, Brandenburg",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400171?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=EF6225E7E2685E4EC2CC9A43A5FE76F7A2B0E793"
       },
       {
-        "provider": "stepstone",
-        "title": "Cloud Software Engineer – Adobe Cloud Platform",
-        "company": "Adobe Systems Europe Limited",
-        "location": "Hamburg, Hamburg, Germany",
-        "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--cloud-software-engineer-adobe-cloud-platform-hamburg-hamburg-germany-adobe-systems-europe-limited--13771971-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP"
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Dortmund, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400205?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=923B3BEA7F2A15DE986CFA6A2BB4639C7F8E00D7"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hannover, Region Hannover (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400199?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=E5473108C0A3E36F7A533DA77B5296662599EF83"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Essen, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400176?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=715678AF7F0FA1C96B29353058E70E6E92271BE4"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Potsdam, Brandenburg",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400146?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=0636BB729BA1ED6A667F8A26DBB80D705FD60B63"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Essen, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T19:39:39Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845354665?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=8DA818344D914AD102D025A0B68857E69B7124A1"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Potsdam, Brandenburg",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400175?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=1C70D670D0B33762C26E7E043DFEBACB7B0FB5D6"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hamburg, Deutschland",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400158?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=473A4FFFA66A31780969488C04663975DF6060F4"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Würzburg, Würzburg (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400187?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=91C5C857019CE0CBFCD20D5C1BA7DF4AC1A64348"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Essen, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T19:39:38Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845354602?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=36CF06642AC925A64752A1E8420390108A906AF9"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hamburg, Deutschland",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400196?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=77487CE3AF986D327F11FEEF44B05218D11D06A5"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Dortmund, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400206?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=09B2CAB907F99BBC55BB0A410EE3924F01D24447"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Würzburg, Würzburg (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400162?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=BA1159CFA0825F2E8C47A6A403171E6CA966D1AA"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Dortmund, Nordrhein-Westfalen",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400200?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=8CB0A6ACD1BA115B51943EC5454680F013C1591E"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hannover, Region Hannover (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400202?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=87764267020C4C1C8D4D2820CF932C875E7F1382"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Application & Software Engineer / Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Regensburg, Regensburg (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400133?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=F1AD026B732FEC787B3895E523B9FB7EE6E091AC"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hamburg, Deutschland",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400179?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=D653AB851341C3D3A22A256747692BEF730A18C8"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Regensburg, Regensburg (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400186?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=DD4D52512045EB8ADC0005A5DB3E488BB254E6A6"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Junior Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Hannover, Region Hannover (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400203?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=6480FF346F12BDA975FA84224BA067B5F8F12C32"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Application & Software Engineer/ Software Developer SAP (w/m/d)",
+        "company": "E.ON Grid Solutions GmbH",
+        "location": "Regensburg, Regensburg (Kreis)",
+        "postedAt": "2026-08-17T20:49:08Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845400204?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=7E40C6C2DFA13733C83C3A38AB65AC9539AE682F"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior Software Engineer - mobile (All Genders)",
+        "company": "Prematch",
+        "location": "Altstadt-Nord, Köln",
+        "postedAt": "2026-08-17T22:01:14Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845410572?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Software Engineer (m/w/d) Embedded Connectivity",
+        "company": "BORA Gruppe Deutschland",
+        "location": "Deutschland",
+        "postedAt": "2026-08-17T19:40:12Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845355644?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=0EEBFB1173EAE597F890C12DB0AA441F431F8F16"
+      },
+      {
+        "provider": "adzuna",
+        "title": "SAP Software Engineer (m/w/d) im Bereich FI",
+        "company": "Thalia Bücher GmbH",
+        "location": "Hagen, Segeberg (Kreis)",
+        "postedAt": "2026-08-17T19:39:40Z",
+        "sourceUrl": "https://www.adzuna.de/land/ad/5845354878?se=SpI0mJua8RGOSIg9zE2Xbg&utm_medium=api&utm_source=1c857c72&v=EF42E637DEF263BDE40347CD9185EE55DF925C3F"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Software Engineer, Infrastructure",
+        "company": "Clera",
+        "location": "Berlin, Deutschland",
+        "postedAt": "2026-08-17T17:48:24Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845308485?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Senior AI Software Engineer (all genders) in Berlin - PRODYNA SE",
+        "company": "PRODYNA SE",
+        "location": "Berlin, Deutschland",
+        "postedAt": "2026-08-17T17:33:22Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845256717?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "DevOps Software Engineer Intern (Enrolled Students Only) (m/f/d)",
+        "company": "Crewmeister",
+        "location": "München, München (Kreis)",
+        "postedAt": "2026-08-17T16:39:23Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845233127?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Backend Software Engineer - AI Systems (m/w/d)",
+        "company": "HAIAR GmbH",
+        "location": "Kinderhaus, Münster",
+        "postedAt": "2026-08-17T16:39:23Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845233060?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Software Engineer - Microservices Architecture (m/w/d)",
+        "company": "DIS AG Germany",
+        "location": "Friedrichstadt, Dresden",
+        "postedAt": "2026-08-17T16:39:19Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845232667?utm_medium=api&utm_source=1c857c72"
+      },
+      {
+        "provider": "adzuna",
+        "title": "Software und Control System Engineer (m/w/d) in Dresden",
+        "company": "DIS AG Germany",
+        "location": "Friedrichstadt, Dresden",
+        "postedAt": "2026-08-17T16:39:18Z",
+        "sourceUrl": "https://www.adzuna.de/details/5845232639?utm_medium=api&utm_source=1c857c72"
       },
       {
         "provider": "jooble",
@@ -121,7 +333,7 @@
         "company": "autoscout24",
         "location": null,
         "postedAt": "2026-08-17T20:56:01.000Z",
-        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/autoscout24/senior-software-engineer-ai-enabler-205619"
+        "sourceUrl": "https://www.arbeitnow.com/jobs/companies/autoscout24/senior-software-engineer-ai-enabler-342738"
       },
       {
         "provider": "arbeitnow",
@@ -156,20 +368,36 @@
         "sourceUrl": "https://www.arbeitnow.com/jobs/companies/machine-learning-reply/agentic-ai-software-engineer-munich-353000"
       },
       {
-        "provider": "career-page",
-        "title": "software engineer English-speaking jobs in Germany",
-        "company": "Company not supplied",
-        "location": null,
-        "postedAt": null,
-        "sourceUrl": "https://englishjobs.de/jobs/software_engineer"
-      },
-      {
         "provider": "arbeitnow",
         "title": "Software Engineer",
         "company": "Preiswecker",
         "location": "Berlin",
         "postedAt": "2026-08-12T06:40:00.000Z",
         "sourceUrl": "https://www.preiswecker.com/"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Software Engineer (Security) - Full Time",
+        "company": "Noelscher Consulting GmbH",
+        "location": "Ulm, Germany",
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--software-engineer-security-full-time-ulm-germany-noelscher-consulting-gmbh--12390572-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Senior Software Engineer – Java (f/m/d)",
+        "company": "IDnow GmbH",
+        "location": "Berlin, Berlin, Germany; München, Bavaria, Germany",
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Senior-Software-Engineer-Java-f-m-d-Berlin-Berlin-Germany;-Muenchen-Bavaria-Germany-IDnow-GmbH--13303206-inline.html"
+      },
+      {
+        "provider": "stepstone",
+        "title": "Embedded Software Engineer (m/f/d)",
+        "company": "Novanta",
+        "location": "Berlin, Germany",
+        "postedAt": null,
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Embedded-Software-Engineer-m-f-d-Berlin-Germany-Novanta--13418595-inline.html"
       }
     ]
   },
@@ -213,56 +441,40 @@
     "jobs": []
   },
   "stepstone": {
-    "jobCount": 5,
+    "jobCount": 3,
     "partial": false,
     "providers": [
       {
         "providerId": "web-discovery",
         "ok": true,
-        "jobsReturned": 5,
+        "jobsReturned": 3,
         "errorCode": null
       }
     ],
     "jobs": [
       {
         "provider": "stepstone",
-        "title": "Softwareentwickler (m/w/d) - Feste Anstellung, Vollzeit, Homeoffice Job in Altötting",
-        "company": "Company not supplied",
-        "location": null,
+        "title": "Software Engineer (Security) - Full Time",
+        "company": "Noelscher Consulting GmbH",
+        "location": "Ulm, Germany",
         "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--Softwareentwickler-m-w-d-Altoetting-Esterer-WD-GmbH--14308290-inline.html"
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--software-engineer-security-full-time-ulm-germany-noelscher-consulting-gmbh--12390572-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP"
       },
       {
         "provider": "stepstone",
-        "title": "2026 Intern - Software Development Engineer",
-        "company": "Adobe Systems Europe Limited",
-        "location": "Hamburg, Hamburg, Germany",
+        "title": "Senior Software Engineer – Java (f/m/d)",
+        "company": "IDnow GmbH",
+        "location": "Berlin, Berlin, Germany; München, Bavaria, Germany",
         "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--2026-Intern-Software-Development-Engineer-Hamburg-Hamburg-Germany-Adobe-Systems-Europe-Limited--13182779-inline.html"
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Senior-Software-Engineer-Java-f-m-d-Berlin-Berlin-Germany;-Muenchen-Bavaria-Germany-IDnow-GmbH--13303206-inline.html"
       },
       {
         "provider": "stepstone",
-        "title": "Anwendungsentwickler / Softwareentwickler (m/w/d) - Feste Anstellung, Vollzeit, Homeoffice Job in Vlotho",
-        "company": "Company not supplied",
-        "location": null,
+        "title": "Embedded Software Engineer (m/f/d)",
+        "company": "Novanta",
+        "location": "Berlin, Germany",
         "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--Anwendungsentwickler-Softwareentwickler-m-w-d-Vlotho-pronorm-Einbaukuechen-GmbH--14251693-inline.html"
-      },
-      {
-        "provider": "stepstone",
-        "title": "Software Engineer",
-        "company": "Quant. Capital GmbH & Co. KG",
-        "location": "Düsseldorf, Germany",
-        "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--Software-Engineer-Duesseldorf-Germany-Quant-Capital-GmbH-Co-KG--12527996-inline.html"
-      },
-      {
-        "provider": "stepstone",
-        "title": "Software Engineer - Professional (m/w/d) - Feste Anstellung, Vollzeit, Homeoffice Job in Nürnberg",
-        "company": "Company not supplied",
-        "location": null,
-        "postedAt": null,
-        "sourceUrl": "https://www.stepstone.de/stellenangebote--Software-Engineer-Professional-m-w-d-Nuernberg-nerdware-GmbH--14075769-inline.html"
+        "sourceUrl": "https://www.stepstone.de/stellenangebote--Embedded-Software-Engineer-m-f-d-Berlin-Germany-Novanta--13418595-inline.html"
       }
     ]
   },

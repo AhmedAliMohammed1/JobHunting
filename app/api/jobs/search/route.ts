@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { expandSearchQuery } from "@/src/lib/ai/query-expansion";
 import { getAIProvider } from "@/src/lib/ai/provider";
 import { searchJobs } from "@/src/lib/jobs/search";
-import { interpretSearchQuery, mergeSearchIntent } from "@/src/lib/jobs/query-intent";
+import { interpretSearchQuery, mergeSearchIntent, shouldUseAIQueryExpansion } from "@/src/lib/jobs/query-intent";
 import { rankJobs } from "@/src/lib/matching/rank";
 import { rateLimit } from "@/src/lib/security/rate-limit";
 import { searchRequestSchema, jobSearchSchema } from "@/src/lib/validation/search";
@@ -12,6 +12,8 @@ import { ZodError } from "zod";
 import type { CandidateProfile, CandidateSkill } from "@/src/types/candidate";
 import type { JobSearchQuery, NormalizedJob } from "@/src/types/jobs";
 import type { MatchResult } from "@/src/types/matching";
+
+const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
 async function loadCandidateProfile(userId: string): Promise<CandidateProfile | undefined> {
   const supabase = await createClient();
@@ -35,7 +37,7 @@ async function loadCandidateProfile(userId: string): Promise<CandidateProfile | 
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const limit = rateLimit(`job-search:${forwarded ?? "anonymous"}`, 20, 60_000);
-  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly." }, { status: 429 });
+  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly." }, { status: 429, headers: privateHeaders });
 
   try {
     const startedAt = Date.now();
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
     const profile = user ? await loadCandidateProfile(user.id) : undefined;
     const deterministic = input.query ? interpretSearchQuery(input.query, profile?.preferredRoles ?? []) : {};
     let expanded: Partial<JobSearchQuery> = {};
-    if (input.query) {
+    if (input.query && shouldUseAIQueryExpansion(input.query, deterministic)) {
       try {
         expanded = await expandSearchQuery(getAIProvider(), input.query, profile?.preferredRoles ?? []);
       } catch {
@@ -61,6 +63,9 @@ export async function POST(request: Request) {
         .map(({ job, match }) => ({ ...job, match }));
     } else if (query.minimumMatchScore !== undefined) {
       warnings.push("Minimum match requires a completed candidate profile, so that filter was not applied.");
+    }
+    if (query.postedWithinHours !== undefined) {
+      warnings.push("Date filters are strict: listings without a verifiable posting date are excluded.");
     }
     if (user) {
       const supabase = await createClient();
@@ -80,8 +85,8 @@ export async function POST(request: Request) {
       disclosure,
       totalMatches: result.totalMatches,
       sourceBreakdown: result.sourceBreakdown,
-    });
+    }, { headers: privateHeaders });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed." }, { status: 400 });
+    return NextResponse.json({ error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed." }, { status: 400, headers: privateHeaders });
   }
 }

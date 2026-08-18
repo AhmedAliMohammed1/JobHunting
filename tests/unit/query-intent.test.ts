@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { interpretSearchQuery, mergeSearchIntent } from "@/src/lib/jobs/query-intent";
+import { interpretSearchQuery, mergeSearchIntent, shouldUseAIQueryExpansion } from "@/src/lib/jobs/query-intent";
 
 describe("natural-language job search interpretation", () => {
   it("extracts the smart-search example from the product specification", () => {
@@ -16,6 +16,19 @@ describe("natural-language job search interpretation", () => {
     expect(intent.keywords).toEqual(["TypeScript"]);
     expect(intent.workplaceTypes).toEqual(["remote"]);
     expect(intent.locations).toEqual(["Europe"]);
+  });
+
+  it("expands embedded searches deterministically into relevant role families", () => {
+    const intent = interpretSearchQuery("Embedded in Germany last 3 days");
+    expect(intent.roles).toEqual(expect.arrayContaining(["Embedded Software Engineer", "Embedded Systems Engineer", "Firmware Engineer", "Embedded Developer"]));
+    expect(intent.countries).toEqual(["Germany"]);
+    expect(intent.postedWithinHours).toBe(72);
+    expect(shouldUseAIQueryExpansion("Embedded in Germany last 3 days", intent)).toBe(false);
+  });
+
+  it("still permits AI expansion for long free-form requests", () => {
+    const request = "I want a broad role that combines embedded systems, validation, hardware software integration, sensors, automotive work, and engineering responsibilities across several adjacent job titles in Germany";
+    expect(shouldUseAIQueryExpansion(request, interpretSearchQuery(request))).toBe(true);
   });
 
   it("does not let empty UI arrays erase interpreted filters", () => {

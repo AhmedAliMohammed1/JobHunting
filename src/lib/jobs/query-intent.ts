@@ -3,6 +3,7 @@ import type { JobSearchQuery, WorkplaceType } from "@/src/types/jobs";
 type SearchIntent = Partial<Omit<JobSearchQuery, "limit">>;
 
 const ROLE_FAMILIES: Array<{ pattern: RegExp; roles: string[] }> = [
+  { pattern: /\b(?:embedded|firmware|microcontroller|rtos|real[ -]?time system)\b/i, roles: ["Embedded Software Engineer", "Embedded Systems Engineer", "Firmware Engineer", "Embedded Developer", "Embedded C++ Engineer"] },
   { pattern: /\b(?:artificial intelligence|ai|ki|künstliche intelligenz|llm|large language model|nlp|natural language processing)\b/i, roles: ["AI Engineer", "Machine Learning Engineer", "NLP Engineer", "LLM Engineer", "Applied AI Engineer", "Generative AI Engineer", "AI Software Engineer", "ML Engineer"] },
   { pattern: /\bmachine learning\b|\bml engineer/i, roles: ["Machine Learning Engineer", "ML Engineer", "Applied Scientist"] },
   { pattern: /\bdata scien(?:ce|tist)\b/i, roles: ["Data Scientist", "Machine Learning Engineer", "Applied Scientist"] },
@@ -20,6 +21,7 @@ const ROLE_FAMILIES: Array<{ pattern: RegExp; roles: string[] }> = [
 const TECHNOLOGIES = [
   "TypeScript", "JavaScript", "React", "Next.js", "Node.js", "Python", "Java", "C++", "C#", ".NET", "Go", "Rust",
   "AWS", "Azure", "GCP", "Docker", "Kubernetes", "PostgreSQL", "SQL", "GraphQL", "PyTorch", "TensorFlow", "LLM", "NLP",
+  "Embedded C", "RTOS", "FreeRTOS", "STM32", "AUTOSAR", "ROS 2",
 ];
 
 const COUNTRY_ALIASES: Array<[RegExp, string]> = [
@@ -132,6 +134,14 @@ export function interpretSearchQuery(text: string, candidateRoles: string[] = []
     experienceLevels: inferExperienceLevels(text),
     postedWithinHours: inferPostedWithinHours(text),
   };
+}
+
+export function shouldUseAIQueryExpansion(text: string, deterministic: SearchIntent): boolean {
+  const roles = deterministic.roles ?? [];
+  if (!roles.length) return true;
+  // Short, well-understood searches do not need a remote LLM round-trip.
+  // Longer free-form requests can still benefit from structured AI expansion.
+  return text.trim().length > 120;
 }
 
 export function mergeSearchIntent(

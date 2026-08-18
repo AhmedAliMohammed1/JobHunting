@@ -15,7 +15,17 @@ const serperResponseSchema = z.object({
   }).passthrough()).default([]),
 }).passthrough();
 
-const cache = new Map<string, { expiresAt: number; value: Array<{ title: string; url: string; content?: string; score?: number; publishedDate?: string }> }>();
+type SerperSearchResult = {
+  title: string;
+  url: string;
+  content?: string;
+  score?: number;
+  publishedDate?: string;
+  employmentType?: string;
+  seniority?: string;
+};
+
+const cache = new Map<string, { expiresAt: number; value: SerperSearchResult[] }>();
 
 function cacheKey(query: string, options: unknown): string {
   return createHash("sha256").update(JSON.stringify([query, options])).digest("hex");
@@ -67,7 +77,10 @@ function indexedTitle(value: string): string {
   return value.replace(/\s*[|–-]\s*(LinkedIn|Indeed(?:\.com)?|Glassdoor)\s*$/i, "").trim();
 }
 
-function enrichedSearchShape(result: { title: string; link: string; snippet?: string | null; date?: string | null }, page: Awaited<ReturnType<typeof fetchPublicJobPageMetadata>>) {
+function enrichedSearchShape(
+  result: { title: string; link: string; snippet?: string | null; date?: string | null },
+  page: Awaited<ReturnType<typeof fetchPublicJobPageMetadata>>,
+): SerperSearchResult {
   const source = sourceForUrl(result.link);
   const title = page.title ?? indexedTitle(result.title);
   const company = page.company;
@@ -79,7 +92,14 @@ function enrichedSearchShape(result: { title: string; link: string; snippet?: st
   else if (company && location && source === "glassdoor") shapedTitle = `${company} hiring ${title} in ${location} | Glassdoor`;
   else if (company && source === "indeed") structuredPrefix = `${title}. ${company}.${location ? ` ${location}.` : ""}`;
 
-  const content = [structuredPrefix, page.description, result.snippet ?? "", result.date ?? ""]
+  const content = [
+    structuredPrefix,
+    page.employmentType ? `Employment type: ${page.employmentType}.` : "",
+    page.seniority ? `Seniority level: ${page.seniority}.` : "",
+    page.description,
+    result.snippet ?? "",
+    result.date ?? "",
+  ]
     .filter(Boolean)
     .join(" ")
     .replace(/\s+/g, " ")
@@ -89,7 +109,12 @@ function enrichedSearchShape(result: { title: string; link: string; snippet?: st
     title: shapedTitle,
     url: result.link,
     content,
-    publishedDate: inferDiscoveryPostedAt(page.datePosted ?? result.date ?? undefined, undefined),
+    publishedDate: inferDiscoveryPostedAt(
+      page.datePosted ?? result.date ?? undefined,
+      [page.description, result.snippet ?? "", result.date ?? ""].filter(Boolean).join(" "),
+    ),
+    employmentType: page.employmentType,
+    seniority: page.seniority,
   };
 }
 
@@ -131,7 +156,7 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
         if (page.dead) return undefined;
         return enrichedSearchShape(result, page);
       }));
-      const value = enriched.filter((result): result is NonNullable<typeof result> => Boolean(result));
+      const value = enriched.filter((result): result is SerperSearchResult => Boolean(result));
       cache.set(key, { expiresAt: Date.now() + cacheTtlSeconds * 1_000, value });
       return value;
     },

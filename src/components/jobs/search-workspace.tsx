@@ -17,6 +17,8 @@ type SearchResponse = {
   interpretedQuery: JobSearchQuery;
   warnings?: string[];
   disclosure?: string;
+  totalMatches?: number;
+  sourceBreakdown?: Record<string, number>;
   error?: string;
 };
 
@@ -59,7 +61,7 @@ function optionalNumber(value: string): number | undefined {
 function queryChips(query: JobSearchQuery | undefined): string[] {
   if (!query) return [];
   return [
-    ...query.roles.slice(0, 4),
+    ...query.roles.slice(0, 5),
     ...query.keywords.slice(0, 3),
     ...query.locations,
     ...query.countries,
@@ -71,14 +73,16 @@ function queryChips(query: JobSearchQuery | undefined): string[] {
 }
 
 function postedLabel(postedAt: string | undefined): string {
-  if (!postedAt) return "Posting date unavailable";
+  if (!postedAt) return "Posting date not supplied by source";
   const timestamp = Date.parse(postedAt);
-  if (!Number.isFinite(timestamp)) return "Posting date unavailable";
+  if (!Number.isFinite(timestamp)) return "Posting date not supplied by source";
+  const date = new Date(timestamp);
+  const absolute = date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   const hours = Math.max(0, Math.floor((Date.now() - timestamp) / 3_600_000));
-  if (hours < 1) return "Posted recently";
-  if (hours < 24) return `Posted ${hours}h ago`;
+  if (hours < 1) return `Posted recently · ${absolute}`;
+  if (hours < 24) return `Posted ${hours}h ago · ${absolute}`;
   const days = Math.floor(hours / 24);
-  return `Posted ${days}d ago`;
+  return `Posted ${days}d ago · ${absolute}`;
 }
 
 export function SearchWorkspace() {
@@ -91,6 +95,8 @@ export function SearchWorkspace() {
   const [interpretedQuery, setInterpretedQuery] = useState<JobSearchQuery>();
   const [notice, setNotice] = useState("Search recent vacancies across APIs, ATS boards, and public job discovery.");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [sourceBreakdown, setSourceBreakdown] = useState<Record<string, number>>({});
+  const [totalMatches, setTotalMatches] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -140,6 +146,7 @@ export function SearchWorkspace() {
     try {
       const response = await fetch("/api/jobs/search", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query.trim() || undefined, filters: filters() }),
       });
@@ -150,6 +157,8 @@ export function SearchWorkspace() {
       setProviders(body.providers);
       setInterpretedQuery(body.interpretedQuery);
       setWarnings(body.warnings ?? []);
+      setSourceBreakdown(body.sourceBreakdown ?? {});
+      setTotalMatches(body.totalMatches ?? body.jobs.length);
       setSearched(true);
       setNotice(body.partial ? `${body.disclosure ?? "Search completed."} Some optional sources were unavailable.` : body.disclosure ?? `${body.jobs.length} roles returned.`);
     } catch (error) {
@@ -157,6 +166,8 @@ export function SearchWorkspace() {
         setSearched(true);
         setJobs([]);
         setProviders([]);
+        setSourceBreakdown({});
+        setTotalMatches(0);
         setNotice(error instanceof Error ? error.message : "Search failed");
       }
     } finally {
@@ -176,10 +187,12 @@ export function SearchWorkspace() {
     setSavedSearchMessage(response.ok ? "Search saved with all interpreted filters and scheduled daily." : body.error ?? "Could not save search.");
   }
 
-  const failedProviders = providers.filter((provider) => !provider.ok).length;
+  const failedProviders = providers.filter((provider) => !provider.ok);
   const chips = queryChips(interpretedQuery);
   const selectableSources = providerCatalog.filter((provider) => ["active", "discovery", "ats-discovery"].includes(provider.availability) && provider.id !== "mock");
   const enabledSourceCount = selectableSources.length;
+  const sourceEntries = Object.entries(sourceBreakdown).sort((a, b) => b[1] - a[1]);
+  const rawRows = providers.reduce((total, provider) => total + (provider.jobsReturned ?? 0), 0);
 
   return <div className="search-workspace">
     <form className="search-bar" onSubmit={(event) => { event.preventDefault(); void search(); }}>
@@ -201,12 +214,12 @@ export function SearchWorkspace() {
       <label>Date posted<select value={postedWithin} onChange={(event) => setPostedWithin(event.target.value)}><option value="">Any time</option><option value="24">Last 24 hours</option><option value="72">Last 3 days</option><option value="168">Last 7 days</option><option value="336">Last 14 days</option><option value="720">Last 30 days</option></select></label>
       <label>Company<input value={company} onChange={(event) => setCompany(event.target.value)} placeholder="Company names" /></label>
       <label>Source<select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All enabled sources</option>{selectableSources.map((provider) => <option value={provider.id} key={provider.id}>{provider.name}</option>)}</select></label>
-      <label>Minimum salary<input type="number" min="0" step="1000" value={minimumSalary} onChange={(event) => setMinimumSalary(event.target.value)} placeholder="60000" /></label>
+      <label>Minimum salary<input type="number" min="0" step="1000" value={minimumSalary} onChange={(event) => setMinimumSalary(event.target.value)} placeholder="e.g. 60000 (optional)" /></label>
       <label>Minimum CV match<select value={minimumMatch} onChange={(event) => setMinimumMatch(event.target.value)}><option value="">Any</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="90">90%</option></select></label>
     </div> : null}
     {providerCatalog.length ? <details className="provider-catalog">
       <summary>Search sources: {enabledSourceCount} enabled · optional sources never block search</summary>
-      <p>Official APIs and public ATS feeds are preferred. When a site has no open global Jobs API, the server can discover publicly indexed job pages through the configured search provider without logging in, bypassing CAPTCHAs, or using private endpoints.</p>
+      <p>Official APIs and public ATS feeds are preferred. When a site has no open global Jobs API, the server discovers publicly indexed individual job pages through Tavily and Google/Serper without logging in or using private endpoints.</p>
       <div className="provider-catalog-grid">
         {providerCatalog.map((provider) => <article key={provider.id}>
           <div><strong>{provider.name}</strong><span className={`provider-state provider-state-${provider.availability}`}>{AVAILABILITY_LABELS[provider.availability]}</span></div>
@@ -216,8 +229,10 @@ export function SearchWorkspace() {
       </div>
     </details> : null}
     {chips.length ? <div className="interpreted-query" aria-label="Interpreted search filters"><strong>Understood as</strong>{chips.map((chip) => <span key={chip}>{chip}</span>)}</div> : null}
-    {providers.length ? <p className="provider-summary">{providers.length} provider pipeline{providers.length === 1 ? "" : "s"} searched · {providers.reduce((total, provider) => total + (provider.jobsReturned ?? 0), 0)} matching rows before deduplication{failedProviders ? ` · ${failedProviders} optional provider${failedProviders === 1 ? "" : "s"} unavailable` : ""}</p> : null}
+    {providers.length ? <p className="provider-summary">{providers.length} provider pipeline{providers.length === 1 ? "" : "s"} searched across {enabledSourceCount} enabled logical sources · {rawRows} matching rows before deduplication · {totalMatches} unique matches{failedProviders.length ? ` · ${failedProviders.length} optional pipeline${failedProviders.length === 1 ? "" : "s"} unavailable` : ""}</p> : null}
+    {sourceEntries.length ? <div className="interpreted-query" aria-label="Returned jobs by source"><strong>Returned by source</strong>{sourceEntries.map(([provider, count]) => <span key={provider}>{PROVIDER_LABELS[provider] ?? provider}: {count}</span>)}</div> : null}
     {warnings.map((warning) => <p className="search-warning" key={warning}><AlertTriangle size={15} />{warning}</p>)}
+    {failedProviders.map((provider) => <p className="search-warning" key={provider.providerId}><AlertTriangle size={15} />{PROVIDER_LABELS[provider.providerId] ?? provider.providerId} was unavailable for this search.</p>)}
     {savedSearchMessage ? <p className="form-status" role="status">{savedSearchMessage}</p> : null}
     <div className="search-results" aria-live="polite" aria-busy={loading}>
       {loading ? Array.from({ length: 3 }, (_, index) => <div className="result-card search-skeleton" key={index}><div /><span /></div>) : null}
@@ -234,10 +249,10 @@ export function SearchWorkspace() {
         <div className="result-actions">
           <SaveJobButton job={job} />
           <a href={job.sourceUrl} target="_blank" rel="noreferrer">Open Job</a>
-          {job.applicationUrl ? <a href={job.applicationUrl} target="_blank" rel="noreferrer">Apply</a> : null}
+          {job.applicationUrl && job.applicationUrl !== job.sourceUrl ? <a href={job.applicationUrl} target="_blank" rel="noreferrer">Apply</a> : null}
         </div>
       </article>)}
-      {!loading && !jobs.length ? <div className="search-empty"><Search size={28} /><h2>{searched ? "No jobs matched this search" : "Describe the role you want"}</h2><p>{searched ? "Try a wider date range or related role. Missing optional API credentials do not stop other enabled providers or public discovery." : "Searches are interpreted into roles, locations, employment type, workplace, and freshness, then queried across enabled sources in parallel."}</p></div> : null}
+      {!loading && !jobs.length ? <div className="search-empty"><Search size={28} /><h2>{searched ? "No jobs matched this search" : "Describe the role you want"}</h2><p>{searched ? "Try a wider date range or related role. Date-filtered searches exclude listings whose source does not expose a verifiable posting date." : "Searches are interpreted into roles, locations, employment type, workplace, and freshness, then queried across enabled sources in parallel."}</p></div> : null}
     </div>
   </div>;
 }

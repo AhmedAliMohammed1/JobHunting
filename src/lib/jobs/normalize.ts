@@ -9,7 +9,12 @@ export function stableJobId(provider: string, externalId: string): string {
 
 export function cleanText(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
-  const clean = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const clean = value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/#{2,}/g, " ")
+    .replace(/[\u2022·]{2,}/g, " · ")
+    .replace(/\s+/g, " ")
+    .trim();
   return clean || undefined;
 }
 
@@ -47,12 +52,18 @@ export function inferSeniority(...values: Array<string | undefined>): string | u
   const text = values.filter(Boolean).join(" ").toLowerCase();
   if (/\b(?:intern|internship|praktikum)\b/.test(text)) return "Internship";
   if (/\bworking[ -]?student\b|\bwerkstudent/.test(text)) return "Working student";
-  if (/\b(?:entry[ -]?level|graduate|new grad|junior)\b/.test(text)) return "Junior";
+  if (/\b(?:entry[ -]?level|berufseinstieg|graduate|new grad|junior)\b/.test(text)) return "Junior";
   if (/\b(?:principal|staff)\b/.test(text)) return /\bprincipal\b/.test(text) ? "Principal" : "Staff";
   if (/\b(?:lead|head of)\b/.test(text)) return "Lead";
   if (/\bsenior\b|\bsr\.?\b/.test(text)) return "Senior";
-  if (/\bmid[ -]?level\b/.test(text)) return "Mid level";
+  if (/\bmid[ -]?level\b|\bmid[ -]?senior\b|\bassociate\b|\bberufserfahren\b/.test(text)) return "Mid level";
   return undefined;
+}
+
+function inferLabelledDiscoverySeniority(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(?:seniority level|karrierestufe)\s*[:·-]?\s*([a-zäöüß -]{3,40})/i)?.[1];
+  return inferSeniority(match);
 }
 
 function sourceTypeFor(provider: string): JobSourceType {
@@ -116,6 +127,9 @@ export function normalizedJob(input: {
   const country = cleanText(input.country) ?? cleanText(discoveryMetadata.country);
   const company = cleanText(discoveryMetadata.company) ?? cleanText(input.company) ?? "Unknown company";
   const postedAt = input.postedAt ?? discoveryMetadata.postedAt;
+  const seniority = cleanText(input.seniority)
+    ?? inferSeniority(input.title)
+    ?? (sourceType === "search-discovery" ? inferLabelledDiscoverySeniority(description) : inferSeniority(description));
 
   return {
     id: stableJobId(input.provider, externalId),
@@ -130,7 +144,7 @@ export function normalizedJob(input: {
     city: cleanText(input.city),
     workplaceType: input.workplaceType ?? inferWorkplaceType(location, description),
     employmentType: cleanText(input.employmentType),
-    seniority: cleanText(input.seniority) ?? inferSeniority(input.title) ?? inferSeniority(description),
+    seniority,
     salaryText: cleanText(input.salaryText),
     salaryMin: input.salaryMin,
     salaryMax: input.salaryMax,

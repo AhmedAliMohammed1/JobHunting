@@ -21,7 +21,7 @@ function query(overrides: Partial<JobSearchQuery> = {}): JobSearchQuery {
 }
 
 describe("major board discovery recall", () => {
-  it("uses advanced domain-restricted discovery for LinkedIn without a hard Tavily date filter", async () => {
+  it("uses advanced domain-restricted discovery for LinkedIn and preserves the requested date window", async () => {
     const calls: Array<{ query: string; options: Record<string, unknown> }> = [];
     const fake: SearchDiscoveryProvider = {
       id: "fake",
@@ -39,9 +39,10 @@ describe("major board discovery recall", () => {
     const provider = createDiscoveryJobProvider(fake);
     const jobs = await provider.search(query({ providers: ["linkedin"] }));
 
-    expect(calls).toHaveLength(1);
+    expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(calls[0].options.searchDepth).toBe("advanced");
-    expect(calls[0].options.postedWithinHours).toBeUndefined();
+    expect(calls[0].options.postedWithinHours).toBe(168);
+    expect(calls[0].options.maxResults).toBe(20);
     expect(calls[0].options.includeDomains).toEqual(expect.arrayContaining(["linkedin.com", "de.linkedin.com"]));
     expect(calls[0].query).toContain("Software Engineer");
     expect(calls[0].query).toContain("Germany");
@@ -53,7 +54,7 @@ describe("major board discovery recall", () => {
     ["linkedin", "site:de.linkedin.com/jobs/view", "https://de.linkedin.com/jobs/view/software-engineer-at-example-4455296976"],
     ["indeed", "site:de.indeed.com/viewjob", "https://de.indeed.com/viewjob?jk=9e2eb651b93dfbe4"],
     ["glassdoor", "site:glassdoor.de/job-listing", "https://www.glassdoor.de/job-listing/software-engineer-example-JV_KO0,17_KE18,25.htm?jl=1010230646697"],
-  ])("retries %s with a Germany-localized individual job-detail path query", async (source, pathOperator, detailUrl) => {
+  ])("retries %s with a Germany-localized individual job-detail path query when primary recall is thin", async (source, pathOperator, detailUrl) => {
     const calls: Array<{ query: string; options: Record<string, unknown> }> = [];
     const fake: SearchDiscoveryProvider = {
       id: "fake",
@@ -75,7 +76,6 @@ describe("major board discovery recall", () => {
     expect(calls).toHaveLength(2);
     expect(calls[1].query).toContain(pathOperator);
     expect(calls[1].query).toContain('"Software Engineer"');
-    expect(calls[1].options.includeDomains).toBeUndefined();
     expect(calls[1].options.postedWithinHours).toBe(168);
     expect(jobs).toHaveLength(1);
     expect(jobs[0].provider).toBe(source);

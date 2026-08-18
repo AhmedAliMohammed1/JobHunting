@@ -64,9 +64,10 @@ export function jobMatchesQuery(job: NormalizedJob, query: JobSearchQuery, now =
   if (query.postedWithinHours !== undefined) {
     const postedAt = job.postedAt ? Date.parse(job.postedAt) : Number.NaN;
     const oldestAllowed = now - query.postedWithinHours * 60 * 60 * 1_000;
-    if (!Number.isFinite(postedAt)) {
-      if (job.sourceType !== "search-discovery") return false;
-    } else if (postedAt < oldestAllowed || postedAt > now) return false;
+    // Freshness filters are strict. Search-engine recency is only a retrieval hint;
+    // a listing must expose a verifiable posting date before it can pass 24h/72h/etc.
+    if (!Number.isFinite(postedAt)) return false;
+    if (postedAt < oldestAllowed || postedAt > now + 5 * 60 * 1_000) return false;
   }
 
   if (query.minimumSalary !== undefined) {
@@ -126,7 +127,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
   const providers = configuredJobProviders(query);
   const settled = await Promise.allSettled(providers.map(async (provider): Promise<ProviderSearchResult> => {
     const started = Date.now();
-    const timeoutMs = provider.id === "web-discovery" ? 15_000 : 10_000;
+    const timeoutMs = provider.id === "web-discovery" ? 20_000 : 10_000;
     const jobs = await withRetry((signal) => provider.search(query, signal), { attempts: 1, timeoutMs });
     return {
       providerId: provider.id,

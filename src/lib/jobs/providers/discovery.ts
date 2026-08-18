@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { JobProvider, JobSearchQuery, NormalizedJob, WorkplaceType } from "@/src/types/jobs";
 import { cleanText, inferWorkplaceType, normalizedJob } from "../normalize";
+import { inferDiscoveryPostedAt } from "../discovery-metadata";
+import { canonicalDiscoveryJobUrl } from "../discovery-url";
 
 export type DiscoverySourceId =
   | "linkedin"
@@ -41,6 +43,7 @@ const SOURCE_DOMAINS: Record<Exclude<DiscoverySourceId, "career-page">, string[]
 const SOURCE_SEARCH_LABELS: Partial<Record<DiscoverySourceId, string>> = {
   linkedin: "LinkedIn Jobs",
   indeed: "Indeed Jobs",
+  stepstone: "StepStone Jobs",
   xing: "XING Jobs",
   glassdoor: "Glassdoor Jobs",
 };
@@ -71,6 +74,8 @@ interface DiscoveryResult {
   content?: string;
   score?: number;
   publishedDate?: string;
+  employmentType?: string;
+  seniority?: string;
 }
 
 interface DiscoveryOptions {
@@ -103,7 +108,7 @@ export interface SearchDiscoveryProvider {
 
 const cache = new Map<string, { expiresAt: number; value: DiscoveryResult[] }>();
 const ADVANCED_DISCOVERY_SOURCES = new Set<DiscoverySourceId>(["linkedin", "indeed", "glassdoor"]);
-const FALLBACK_DISCOVERY_SOURCES = new Set<DiscoverySourceId>(["linkedin", "indeed", "xing", "glassdoor"]);
+const FALLBACK_DISCOVERY_SOURCES = new Set<DiscoverySourceId>(["linkedin", "indeed", "stepstone", "xing", "glassdoor"]);
 
 function cacheKey(query: string, options: DiscoveryOptions): string {
   return createHash("sha256").update(JSON.stringify([query, options])).digest("hex");
@@ -184,11 +189,11 @@ export function buildSearchQuery(input: DiscoveryQueryInput): string {
 }
 
 function buildNaturalSearchQuery(input: DiscoveryQueryInput): string {
-  const primaryRole = [input.roles[0], ...input.keywords].filter(Boolean).slice(0, 4).join(" ");
+  const roleTerms = quoted([...input.roles, ...input.keywords].slice(0, 6));
   const locations = [...input.locations, ...input.countries].filter(Boolean).slice(0, 4).join(" ");
   const employment = employmentTerms(input.employmentTypes).slice(0, 3).join(" ");
   const workplaces = input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type).join(" ");
-  return [primaryRole || "job", "job opening", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
+  return [roleTerms ? `(${roleTerms})` : "job", "job opening", locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
 }
 
 function isGermanSearch(input: DiscoveryQueryInput): boolean {
@@ -206,12 +211,12 @@ function detailPageOperator(source: DiscoverySourceId, input: DiscoveryQueryInpu
 
 function buildSourceFallbackQuery(source: DiscoverySourceId, input: DiscoveryQueryInput): string {
   const target = detailPageOperator(source, input) ?? SOURCE_SEARCH_LABELS[source] ?? source;
-  const primaryRole = input.roles[0] ? `"${input.roles[0].replace(/"/g, "")}"` : (input.keywords[0] ?? "job");
+  const roles = quoted(input.roles.slice(0, 5));
   const keywords = input.keywords.slice(0, 3).join(" ");
   const locations = [...input.locations, ...input.countries].filter(Boolean).slice(0, 4).join(" ");
   const employment = employmentTerms(input.employmentTypes).slice(0, 3).join(" ");
   const workplaces = input.workplaceTypes.filter((type) => type !== "unknown").map((type) => type === "onsite" ? "on-site" : type).join(" ");
-  return [target, primaryRole, keywords, locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
+  return [target, roles || input.keywords[0] || "job", keywords, locations, employment, workplaces, input.companies.join(" ")].filter(Boolean).join(" ");
 }
 
 export function detectATS(url: string): DiscoverySourceId | undefined {
@@ -304,29 +309,6 @@ function extractFields(result: DiscoveryResult, source: DiscoverySourceId): { ti
   return { title: raw || "Job opening", company: "Company not supplied" };
 }
 
-function inferPostedAt(publishedDate: string | undefined, content: string | undefined): string | undefined {
-  if (publishedDate && Number.isFinite(Date.parse(publishedDate))) return new Date(publishedDate).toISOString();
-  const text = content ?? "";
-  const now = Date.now();
-  const relative = text.match(/\b(\d{1,2})\s*(hours?|hrs?|days?|weeks?)\s+ago\b/i);
-  if (relative) {
-    const amount = Number(relative[1]);
-    const unit = relative[2].toLowerCase();
-    const hours = unit.startsWith("week") ? amount * 168 : unit.startsWith("day") ? amount * 24 : amount;
-    return new Date(now - hours * 3_600_000).toISOString();
-  }
-  const german = text.match(/\bvor\s+(\d{1,2})\s*(stunde(?:n)?|tag(?:en)?|woche(?:n)?)\b/i);
-  if (german) {
-    const amount = Number(german[1]);
-    const unit = german[2].toLowerCase();
-    const hours = unit.startsWith("woche") ? amount * 168 : unit.startsWith("tag") ? amount * 24 : amount;
-    return new Date(now - hours * 3_600_000).toISOString();
-  }
-  if (/\b(?:today|heute)\b/i.test(text)) return new Date(now).toISOString();
-  if (/\b(?:yesterday|gestern)\b/i.test(text)) return new Date(now - 24 * 3_600_000).toISOString();
-  return undefined;
-}
-
 function providerGroups(query: JobSearchQuery): DiscoveryGroup[] {
   const requested = query.providers.filter((id): id is DiscoverySourceId => DISCOVERY_SOURCE_IDS.includes(id as DiscoverySourceId));
   if (requested.length) {
@@ -347,11 +329,23 @@ function providerGroups(query: JobSearchQuery): DiscoveryGroup[] {
 }
 
 function validDiscoveryResult(result: DiscoveryResult, expectedSource?: DiscoverySourceId): boolean {
-  if ((result.score ?? 1) < 0.25 || !isLikelyJobUrl(result.url)) return false;
+  if ((result.score ?? 1) < 0.12 || !isLikelyJobUrl(result.url)) return false;
   const source = detectJobSource(result.url);
   if (expectedSource && source !== expectedSource) return false;
   if (!expectedSource && !detectATS(result.url)) return false;
   return !(source === "career-page" && isGenericCareerTitle(cleanResultTitle(result.title)));
+}
+
+function mergeRows(rows: DiscoveryResult[]): DiscoveryResult[] {
+  const byKey = new Map<string, DiscoveryResult>();
+  for (const row of rows) {
+    const canonical = canonicalDiscoveryJobUrl(row.url);
+    const key = canonical?.sourceId ? `${detectJobSource(row.url)}:${canonical.sourceId}` : canonical?.url ?? row.url;
+    const existing = byKey.get(key);
+    const score = (value: DiscoveryResult) => (value.publishedDate ? 4 : 0) + Math.min(value.content?.length ?? 0, 800) / 100 + (value.score ?? 0);
+    if (!existing || score(row) >= score(existing)) byKey.set(key, row);
+  }
+  return [...byKey.values()];
 }
 
 export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvider): JobProvider {
@@ -361,7 +355,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
     sourceType: "search-discovery",
     async search(query, signal) {
       const groups = providerGroups(query);
-      const perSourceLimit = Math.min(12, Math.max(8, Math.ceil(query.limit / Math.max(1, groups.length))));
+      const perSourceLimit = Math.min(20, Math.max(12, Math.ceil(query.limit / Math.max(1, groups.length)) * 2));
       const settled = await Promise.allSettled(groups.map(async (group) => {
         const input: DiscoveryQueryInput = {
           source: group.source,
@@ -377,30 +371,31 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
         const searchQuery = advanced ? buildNaturalSearchQuery(input) : buildSearchQuery(input);
         const primaryRows = await searchProvider.search(searchQuery, {
           includeDomains: group.domains,
-          postedWithinHours: advanced ? undefined : query.postedWithinHours,
-          maxResults: group.source ? 12 : perSourceLimit,
+          postedWithinHours: query.postedWithinHours,
+          maxResults: group.source ? perSourceLimit : Math.min(12, perSourceLimit),
           searchDepth: advanced ? "advanced" : "basic",
         }, signal);
 
         let validRows = primaryRows.filter((result) => validDiscoveryResult(result, group.source));
-        if (!validRows.length && group.source && FALLBACK_DISCOVERY_SOURCES.has(group.source)) {
+        const recoveryThreshold = group.source ? Math.min(6, Math.ceil(perSourceLimit / 3)) : 0;
+        if (group.source && FALLBACK_DISCOVERY_SOURCES.has(group.source) && validRows.length < recoveryThreshold) {
           const fallbackRows = await searchProvider.search(buildSourceFallbackQuery(group.source, input), {
             postedWithinHours: query.postedWithinHours,
-            maxResults: 12,
+            maxResults: perSourceLimit,
             searchDepth: advanced ? "advanced" : "basic",
           }, signal);
-          validRows = fallbackRows.filter((result) => validDiscoveryResult(result, group.source));
+          validRows = mergeRows([...validRows, ...fallbackRows.filter((result) => validDiscoveryResult(result, group.source))]);
         }
         return validRows;
       }));
       if (settled.every((result) => result.status === "rejected")) throw new Error("All discovery searches failed");
-      const rows = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+      const rows = mergeRows(settled.flatMap((result) => result.status === "fulfilled" ? result.value : []));
       return rows.map((result): NormalizedJob => {
         const source = detectJobSource(result.url);
         const fields = extractFields(result, source);
         const description = cleanText(result.content);
         const workplaceType = inferWorkplaceType(fields.location, description);
-        const postedAt = inferPostedAt(result.publishedDate, result.content);
+        const postedAt = inferDiscoveryPostedAt(result.publishedDate, result.content);
         return normalizedJob({
           provider: source,
           sourceType: "search-discovery",
@@ -410,7 +405,8 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
           location: fields.location,
           description,
           snippet: description?.slice(0, 320),
-          employmentType: inferEmploymentType(fields.title, description),
+          employmentType: result.employmentType ?? inferEmploymentType(fields.title, description),
+          seniority: result.seniority,
           workplaceType,
           postedAt,
           sourceUrl: result.url,

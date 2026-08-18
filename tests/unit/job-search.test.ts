@@ -65,12 +65,19 @@ describe("job search result filtering", () => {
     expect(jobMatchesQuery({ ...job, postedAt: undefined, salaryMin: undefined, salaryMax: undefined }, query({ postedWithinHours: 24, minimumSalary: 1 }), now)).toBe(false);
   });
 
-  it("never loses an already-recent job when the freshness window is widened", () => {
-    expect(jobMatchesQuery(job, query({ postedWithinHours: 24 }), now)).toBe(true);
-    expect(jobMatchesQuery(job, query({ postedWithinHours: 72 }), now)).toBe(true);
+  it("never lets a discovery listing with an unknown date through a freshness filter", () => {
+    const discovery = { ...job, provider: "linkedin", sourceType: "search-discovery" as const, postedAt: undefined };
+    expect(jobMatchesQuery(discovery, query({ postedWithinHours: 72 }), now)).toBe(false);
+  });
 
-    const twoDaysOld = { ...job, postedAt: "2026-08-15T12:00:00.000Z" };
-    expect(jobMatchesQuery(twoDaysOld, query({ postedWithinHours: 24 }), now)).toBe(false);
-    expect(jobMatchesQuery(twoDaysOld, query({ postedWithinHours: 72 }), now)).toBe(true);
+  it("rejects a four-day-old discovery listing from a three-day search", () => {
+    const discovery = { ...job, provider: "linkedin", sourceType: "search-discovery" as const, postedAt: "2026-08-13T11:59:00.000Z" };
+    expect(jobMatchesQuery(discovery, query({ postedWithinHours: 72 }), now)).toBe(false);
+  });
+
+  it("keeps a 24-hour result when the same query is widened to 72 hours", () => {
+    const recent = { ...job, postedAt: "2026-08-17T06:00:00.000Z" };
+    expect(jobMatchesQuery(recent, query({ postedWithinHours: 24 }), now)).toBe(true);
+    expect(jobMatchesQuery(recent, query({ postedWithinHours: 72 }), now)).toBe(true);
   });
 });

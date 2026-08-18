@@ -63,9 +63,24 @@ describe("search-discovery metadata enrichment", () => {
       now: NOW,
     });
 
-    expect(metadata.company).toBe("General Dynamics Mission Systems, Inc");
+    expect(metadata.company).toBe("General Dynamics Mission Systems, Inc.");
     expect(metadata.location).toBe("Hohenfels");
     expect(metadata.postedAt).toBe("2026-08-15T02:00:00.000Z");
+  });
+
+  it("extracts Indeed company/location around ratings when the title has no location", () => {
+    const metadata = inferDiscoveryMetadata({
+      provider: "indeed",
+      title: "Embedded Software Engineer- German fluent (m/f/d)",
+      company: "Company not supplied",
+      description: "Embedded Software Engineer- German fluent (m/f/d). Molex. ·. 3.7. Bochum. Leistungen. Aus der vollständigen Stellenbeschreibung. 4 hours ago",
+      sourceUrl: "https://de.indeed.com/viewjob?jk=e4eb0b5c5f7c964d",
+      now: NOW,
+    });
+
+    expect(metadata.company).toBe("Molex");
+    expect(metadata.location).toBe("Bochum");
+    expect(metadata.postedAt).toBe("2026-08-17T22:00:00.000Z");
   });
 
   it("parses absolute indexed dates when a relative date is unavailable", () => {

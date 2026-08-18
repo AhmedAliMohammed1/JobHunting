@@ -20,8 +20,28 @@ describe("search discovery fallback", () => {
     expect(results.some((result) => result.url.includes("/jobs/view/"))).toBe(true);
   });
 
+  it("calls Serper when Tavily detail pages are below the discovery relevance threshold", async () => {
+    const primarySearch = vi.fn(async () => [{
+      title: "Low relevance LinkedIn hit",
+      url: "https://www.linkedin.com/jobs/view/software-engineer-at-example-4410824998",
+      content: "Software role",
+      score: 0.12,
+    }]);
+    const fallbackSearch = vi.fn(async () => [{
+      title: "Relevant LinkedIn hit",
+      url: "https://www.linkedin.com/jobs/view/software-engineer-at-example-4410824999",
+      content: "1 day ago",
+    }]);
+    const primary: SearchDiscoveryProvider = { id: "tavily", search: primarySearch };
+    const fallback: SearchDiscoveryProvider = { id: "serper", search: fallbackSearch };
+    const provider = createFallbackSearchDiscoveryProvider([primary, fallback]);
+    const results = await provider.search("Software Engineer Germany", options);
+    expect(fallbackSearch).toHaveBeenCalledTimes(1);
+    expect(results).toHaveLength(2);
+  });
+
   it("does not spend a Serper query when Tavily already has a valid detail page", async () => {
-    const primarySearch = vi.fn(async () => [{ title: "Contabo hiring Software Engineer in Germany | LinkedIn", url: "https://www.linkedin.com/jobs/view/software-engineer-at-contabo-4410824202", content: "2 days ago" }]);
+    const primarySearch = vi.fn(async () => [{ title: "Contabo hiring Software Engineer in Germany | LinkedIn", url: "https://www.linkedin.com/jobs/view/software-engineer-at-contabo-4410824202", content: "2 days ago", score: 0.8 }]);
     const fallbackSearch = vi.fn(async () => []);
     const primary: SearchDiscoveryProvider = { id: "tavily", search: primarySearch };
     const fallback: SearchDiscoveryProvider = { id: "serper", search: fallbackSearch };
@@ -29,6 +49,26 @@ describe("search discovery fallback", () => {
     const results = await provider.search("Software Engineer Germany", options);
     expect(results).toHaveLength(1);
     expect(fallbackSearch).not.toHaveBeenCalled();
+  });
+
+  it("runs Serper on domainless recovery queries because source validity cannot be known at the composite layer", async () => {
+    const primarySearch = vi.fn(async () => [{
+      title: "Generic search result",
+      url: "https://example.com/jobs/software-engineer",
+      content: "Generic result",
+    }]);
+    const fallbackSearch = vi.fn(async () => [{
+      title: "LinkedIn Software Engineer",
+      url: "https://www.linkedin.com/jobs/view/software-engineer-at-example-4410825000",
+      content: "today",
+    }]);
+    const primary: SearchDiscoveryProvider = { id: "tavily", search: primarySearch };
+    const fallback: SearchDiscoveryProvider = { id: "serper", search: fallbackSearch };
+    const provider = createFallbackSearchDiscoveryProvider([primary, fallback]);
+    const results = await provider.search("LinkedIn Jobs Software Engineer Germany", { maxResults: 20 });
+    expect(primarySearch).toHaveBeenCalledTimes(1);
+    expect(fallbackSearch).toHaveBeenCalledTimes(1);
+    expect(results).toHaveLength(2);
   });
 
   it("uses Serper when Tavily fails without making aggregate discovery fail", async () => {

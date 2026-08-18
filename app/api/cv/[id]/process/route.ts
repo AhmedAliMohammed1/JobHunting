@@ -23,7 +23,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const { data: document, error: documentError } = await supabase
     .from("cv_documents")
-    .select("id")
+    .select("id,parse_status,parse_error,extracted_text")
     .eq("id", id.data)
     .eq("user_id", user.id)
     .is("deleted_at", null)
@@ -31,6 +31,13 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   if (documentError) return NextResponse.json({ error: "Could not load the CV document." }, { status: 500, headers: privateHeaders });
   if (!document) return NextResponse.json({ error: "CV document not found." }, { status: 404, headers: privateHeaders });
+
+  if (typeof document.extracted_text === "string" && document.extracted_text.trim().length >= 40) {
+    if (document.parse_status !== "COMPLETE" || document.parse_error?.startsWith("AI profile extraction failed:")) {
+      await supabase.from("cv_documents").update({ parse_status: "COMPLETE" }).eq("id", document.id).eq("user_id", user.id);
+    }
+    return NextResponse.json({ ok: true, documentId: document.id, characters: document.extracted_text.length, cached: true }, { headers: privateHeaders });
+  }
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { inferDiscoveryPostedAt } from "../discovery-metadata";
+import { canonicalDiscoveryJobUrl } from "../discovery-url";
+import { fetchPublicJobPageMetadata } from "../job-page-metadata";
 import type { SearchDiscoveryProvider } from "./discovery";
 
 const serperResponseSchema = z.object({
@@ -49,6 +51,48 @@ function recencyTbs(hours: number | undefined): string | undefined {
   return undefined;
 }
 
+function sourceForUrl(url: string): "linkedin" | "indeed" | "glassdoor" | "other" {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes("linkedin.com")) return "linkedin";
+    if (host.includes("indeed.com")) return "indeed";
+    if (host.includes("glassdoor.")) return "glassdoor";
+  } catch {
+    // ignored
+  }
+  return "other";
+}
+
+function indexedTitle(value: string): string {
+  return value.replace(/\s*[|–-]\s*(LinkedIn|Indeed(?:\.com)?|Glassdoor)\s*$/i, "").trim();
+}
+
+function enrichedSearchShape(result: { title: string; link: string; snippet?: string | null; date?: string | null }, page: Awaited<ReturnType<typeof fetchPublicJobPageMetadata>>) {
+  const source = sourceForUrl(result.link);
+  const title = page.title ?? indexedTitle(result.title);
+  const company = page.company;
+  const location = page.location;
+
+  let shapedTitle = result.title;
+  let structuredPrefix = "";
+  if (company && location && source === "linkedin") shapedTitle = `${company} hiring ${title} in ${location} | LinkedIn`;
+  else if (company && location && source === "glassdoor") shapedTitle = `${company} hiring ${title} in ${location} | Glassdoor`;
+  else if (company && source === "indeed") structuredPrefix = `${title}. ${company}.${location ? ` ${location}.` : ""}`;
+
+  const content = [structuredPrefix, page.description, result.snippet ?? "", result.date ?? ""]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    title: shapedTitle,
+    url: result.link,
+    content,
+    publishedDate: inferDiscoveryPostedAt(page.datePosted ?? result.date ?? undefined, undefined),
+  };
+}
+
 export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600): SearchDiscoveryProvider {
   return {
     id: "serper",
@@ -59,7 +103,6 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
 
       const body: Record<string, unknown> = {
         q: withSiteOperators(query, options.includeDomains),
-        // Serper rejects num values above 10 for this endpoint/account tier.
         num: Math.min(10, Math.max(1, options.maxResults ?? 10)),
         hl: languageForQuery(query),
       };
@@ -82,14 +125,13 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
       if (!response.ok) throw new Error(`Serper returned ${response.status}`);
 
       const parsed = serperResponseSchema.parse(await response.json());
-      const value = parsed.organic.map((result) => ({
-        title: result.title,
-        url: result.link,
-        content: [result.snippet ?? "", result.date ?? ""].filter(Boolean).join(" "),
-        // Normalize Google's dedicated result date before downstream parsing so
-        // unrelated dates inside LinkedIn/Indeed snippets cannot win by accident.
-        publishedDate: inferDiscoveryPostedAt(result.date ?? undefined, undefined),
+      const candidates = parsed.organic.filter((result) => canonicalDiscoveryJobUrl(result.link));
+      const enriched = await Promise.all(candidates.map(async (result) => {
+        const page = await fetchPublicJobPageMetadata(result.link, signal);
+        if (page.dead) return undefined;
+        return enrichedSearchShape(result, page);
       }));
+      const value = enriched.filter((result): result is NonNullable<typeof result> => Boolean(result));
       cache.set(key, { expiresAt: Date.now() + cacheTtlSeconds * 1_000, value });
       return value;
     },

@@ -25,7 +25,7 @@ export const DISCOVERY_SOURCE_IDS: DiscoverySourceId[] = [
 
 const SOURCE_DOMAINS: Record<Exclude<DiscoverySourceId, "career-page">, string[]> = {
   linkedin: ["linkedin.com"],
-  indeed: ["indeed.com"],
+  indeed: ["indeed.com", "de.indeed.com"],
   stepstone: ["stepstone.de"],
   xing: ["xing.com"],
   glassdoor: ["glassdoor.com", "glassdoor.de"],
@@ -199,7 +199,7 @@ export function isLikelyJobUrl(url: string): boolean {
     const segments = parsed.pathname.split("/").filter(Boolean);
     if (/\/(?:login|signin|privacy|terms|blog|news)(?:\/|$)/.test(path)) return false;
     if (source === "linkedin") return /\/jobs\/view\//.test(path);
-    if (source === "indeed") return /\/viewjob|\/pagead\//.test(path);
+    if (source === "indeed") return /\/viewjob|\/pagead\/|\/rc\/clk|[?&]jk=/.test(path);
     if (source === "stepstone") return /\/stellenangebote|\/job\//.test(path);
     if (source === "xing") return /\/jobs\//.test(path);
     if (source === "glassdoor") return /\/job-listing\/|\/partner\/joblisting/.test(path);
@@ -228,6 +228,13 @@ function cleanResultTitle(value: string): string {
   return value.replace(/\s*[|–-]\s*(LinkedIn|Indeed(?:\.com)?|StepStone|XING|Glassdoor)\s*$/i, "").trim();
 }
 
+function isGenericCareerTitle(value: string): boolean {
+  const title = value.trim().toLowerCase();
+  return /^(?:careers?|jobs?|vacancies|stellenangebote)(?:\s*[|–-].*)?$/.test(title)
+    || /^(?:careers?|jobs?|vacancies|stellenangebote)\s+(?:at|@)\b/.test(title)
+    || /\b(?:career opportunities|join our team|company careers?|job search)\b/.test(title);
+}
+
 function extractFields(result: DiscoveryResult, source: DiscoverySourceId): { title: string; company: string; location?: string } {
   const raw = cleanResultTitle(result.title);
   if (source === "linkedin") {
@@ -246,11 +253,20 @@ function providerGroups(query: JobSearchQuery): Array<{ source?: DiscoverySource
   if (requested.length) {
     return requested.map((source) => ({ source, domains: source === "career-page" ? undefined : SOURCE_DOMAINS[source] }));
   }
-  return [
-    { domains: ["linkedin.com", "indeed.com", "stepstone.de", "xing.com", "glassdoor.com", "glassdoor.de"] },
+
+  const groups: Array<{ source?: DiscoverySourceId; domains?: string[] }> = [
+    { source: "linkedin", domains: SOURCE_DOMAINS.linkedin },
+    { source: "indeed", domains: SOURCE_DOMAINS.indeed },
+    { source: "stepstone", domains: SOURCE_DOMAINS.stepstone },
+    { source: "xing", domains: SOURCE_DOMAINS.xing },
+    { source: "glassdoor", domains: SOURCE_DOMAINS.glassdoor },
     { domains: ["boards.greenhouse.io", "job-boards.greenhouse.io", "jobs.lever.co", "jobs.ashbyhq.com", "jobs.smartrecruiters.com", "jobs.personio.de", "jobs.personio.com", "myworkdayjobs.com", "successfactors.com"] },
-    { source: "career-page" },
   ];
+
+  // Generic career-page discovery is useful when a company was explicitly requested,
+  // but is too noisy for broad searches and can crowd out real job-detail pages.
+  if (query.companies.length) groups.push({ source: "career-page" });
+  return groups;
 }
 
 export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvider): JobProvider {
@@ -260,6 +276,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
     sourceType: "search-discovery",
     async search(query, signal) {
       const groups = providerGroups(query);
+      const perSourceLimit = Math.min(12, Math.max(6, Math.ceil(query.limit / Math.max(1, groups.length))));
       const settled = await Promise.allSettled(groups.map(async (group) => {
         const searchQuery = buildSearchQuery({
           source: group.source,
@@ -271,12 +288,17 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
           workplaceTypes: query.workplaceTypes,
           companies: query.companies,
         });
-        return searchProvider.search(searchQuery, { includeDomains: group.domains, postedWithinHours: query.postedWithinHours, maxResults: Math.min(20, query.limit) }, signal);
+        return searchProvider.search(searchQuery, { includeDomains: group.domains, postedWithinHours: query.postedWithinHours, maxResults: perSourceLimit }, signal);
       }));
       if (settled.every((result) => result.status === "rejected")) throw new Error("All discovery searches failed");
       const rows = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       return rows
-        .filter((result) => (result.score ?? 1) >= 0.35 && isLikelyJobUrl(result.url))
+        .filter((result) => {
+          if ((result.score ?? 1) < 0.3 || !isLikelyJobUrl(result.url)) return false;
+          const source = detectJobSource(result.url);
+          if (source === "career-page" && isGenericCareerTitle(cleanResultTitle(result.title))) return false;
+          return true;
+        })
         .map((result): NormalizedJob => {
           const source = detectJobSource(result.url);
           const fields = extractFields(result, source);

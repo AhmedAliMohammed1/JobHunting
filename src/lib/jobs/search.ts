@@ -22,8 +22,8 @@ const PRIORITY_JOB_SOURCES = new Map<string, number>([
   ["glassdoor", 0.9],
 ]);
 
-const MAX_DISCOVERY_METADATA_ENRICHMENTS = 50;
-const DISCOVERY_METADATA_CONCURRENCY = 12;
+const MAX_DISCOVERY_METADATA_ENRICHMENTS = 70;
+const DISCOVERY_METADATA_CONCURRENCY = 16;
 
 const GENERIC_ROLE_TOKENS = new Set([
   "engineer", "engineering", "developer", "software", "system", "systems", "specialist", "consultant",
@@ -191,16 +191,16 @@ function matchesCountryFilter(job: NormalizedJob, countries: string[]): boolean 
 
   const detected = detectedCountryFromLocation(location);
   if (detected) return targets.includes(detected);
-
-  // Major-board discovery queries are already country-scoped. A public result
-  // frequently exposes only a city (or no location) until the destination page
-  // is opened. Keep it unless we can positively identify a conflicting country.
-  if (job.sourceType === "search-discovery") return true;
   return false;
 }
 
 function inferredCountryFromLocation(location: string | undefined): string | undefined {
   return displayCountry(detectedCountryFromLocation(location));
+}
+
+function isUnknownCountry(value: string | undefined): boolean {
+  const country = normalized(value);
+  return !country || country === "unknown" || country === "not supplied" || country === "location not supplied";
 }
 
 function richerLocation(current: string | undefined, incoming: string | undefined): string | undefined {
@@ -331,13 +331,16 @@ async function enrichDiscoveryJob(job: NormalizedJob): Promise<NormalizedJob> {
   if (page.dead) return job;
   const parsedPostedAt = page.datePosted ? Date.parse(page.datePosted) : Number.NaN;
   const location = richerLocation(job.location, page.location);
+  const country = isUnknownCountry(job.country)
+    ? (page.country ?? inferredCountryFromLocation(location))
+    : job.country;
 
   return {
     ...job,
     title: page.title ?? job.title,
     company: !hasKnownCompany(job) && page.company ? page.company : job.company,
     location,
-    country: job.country ?? page.country ?? inferredCountryFromLocation(location),
+    country,
     description: page.description ?? job.description,
     employmentType: job.employmentType ?? page.employmentType,
     seniority: job.seniority ?? page.seniority,
@@ -345,15 +348,19 @@ async function enrichDiscoveryJob(job: NormalizedJob): Promise<NormalizedJob> {
   };
 }
 
-async function enrichRelevantUndatedDiscoveryJobs(
+function needsCountryVerification(job: NormalizedJob, query: JobSearchQuery): boolean {
+  return query.countries.length > 0 && isUnknownCountry(job.country);
+}
+
+async function enrichRelevantDiscoveryJobs(
   jobs: NormalizedJob[],
   query: JobSearchQuery,
   now: number,
 ): Promise<NormalizedJob[]> {
-  if (query.postedWithinHours === undefined || !jobs.length) return jobs;
+  if (!jobs.length || (query.postedWithinHours === undefined && !query.countries.length)) return jobs;
 
-  // Search snippets are often incomplete. Do not reject a plausible discovery
-  // row for missing location/country/structured metadata before opening the job page.
+  // Search snippets often carry a usable date but omit the country, or vice versa.
+  // Verify whichever strict field is missing before throwing the listing away.
   const preMetadataQuery: JobSearchQuery = {
     ...query,
     keywords: [],
@@ -367,27 +374,37 @@ async function enrichRelevantUndatedDiscoveryJobs(
   };
   const indexes = jobs
     .map((job, index) => ({ job, index }))
-    .filter(({ job }) => job.sourceType === "search-discovery" && !hasVerifiablePostedAt(job) && jobMatchesQuery(job, preMetadataQuery, now))
+    .filter(({ job }) => {
+      if (job.sourceType !== "search-discovery" || !jobMatchesQuery(job, preMetadataQuery, now)) return false;
+      const needsDate = query.postedWithinHours !== undefined && !hasVerifiablePostedAt(job);
+      return needsDate || needsCountryVerification(job, query);
+    })
+    .sort((a, b) => providerPriority(b.job) - providerPriority(a.job))
     .slice(0, MAX_DISCOVERY_METADATA_ENRICHMENTS);
 
   if (!indexes.length) return jobs;
 
   const enriched = await mapWithConcurrency(indexes, DISCOVERY_METADATA_CONCURRENCY, async ({ job, index }) => ({
     index,
+    beforeCountry: job.country,
     job: await enrichDiscoveryJob(job),
   }));
   const copy = [...jobs];
   let recoveredDates = 0;
+  let recoveredCountries = 0;
 
   for (const item of enriched) {
     copy[item.index] = item.job;
     if (hasVerifiablePostedAt(item.job)) recoveredDates += 1;
+    if (isUnknownCountry(item.beforeCountry) && !isUnknownCountry(item.job.country)) recoveredCountries += 1;
   }
 
   log("info", "job_discovery_metadata_enriched", {
     attempted: indexes.length,
     recoveredDates,
-    stillUndated: indexes.length - recoveredDates,
+    recoveredCountries,
+    stillUndated: indexes.filter(({ job }) => !hasVerifiablePostedAt(copy[jobs.indexOf(job)])).length,
+    stillUnknownCountry: enriched.filter((item) => isUnknownCountry(item.job.country)).length,
   });
 
   return copy;
@@ -422,7 +439,7 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
   const now = Date.now();
   const enrichedResults = await Promise.all(results.map(async (result) => {
     if (result.providerId !== "web-discovery") return result;
-    const jobs = await enrichRelevantUndatedDiscoveryJobs(result.jobs, query, now);
+    const jobs = await enrichRelevantDiscoveryJobs(result.jobs, query, now);
     return { ...result, jobs };
   }));
 
@@ -453,8 +470,8 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
     totalMatches: ranked.length,
     returned: jobs.length,
     sourceBreakdown: JSON.stringify(sourceBreakdown),
-    rawProviderRows: JSON.stringify(Object.fromEntries(results.map((result) => [result.providerId, result.jobs.length]))),
-    providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length]))),
+    rawProviderRows: JSON.stringify(Object.fromEntries(results.map((result) => [result.providerId, result.jobs.length])),
+    providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length])),
   });
 
   return {

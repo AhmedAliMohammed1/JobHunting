@@ -21,7 +21,7 @@ function query(overrides: Partial<JobSearchQuery> = {}): JobSearchQuery {
 }
 
 describe("major board discovery recall", () => {
-  it("uses advanced, path-restricted discovery for LinkedIn without a hard Tavily date filter", async () => {
+  it("uses advanced domain-restricted discovery for LinkedIn without a hard Tavily date filter", async () => {
     const calls: Array<{ query: string; options: Record<string, unknown> }> = [];
     const fake: SearchDiscoveryProvider = {
       id: "fake",
@@ -42,7 +42,7 @@ describe("major board discovery recall", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].options.searchDepth).toBe("advanced");
     expect(calls[0].options.postedWithinHours).toBeUndefined();
-    expect(calls[0].options.includeDomains).toEqual(expect.arrayContaining(["linkedin.com/jobs/view", "de.linkedin.com/jobs/view"]));
+    expect(calls[0].options.includeDomains).toEqual(expect.arrayContaining(["linkedin.com", "de.linkedin.com"]));
     expect(calls[0].query).toContain("last 7 days");
     expect(jobs[0]).toMatchObject({ provider: "linkedin", company: "Contabo", title: "Software Engineer (all genders)", location: "Deutschland" });
     expect(jobs[0].postedAt).toBeTruthy();
@@ -52,5 +52,23 @@ describe("major board discovery recall", () => {
     expect(isLikelyJobUrl("https://www.xing.com/jobs/t-software-engineer")).toBe(false);
     expect(isLikelyJobUrl("https://www.xing.com/jobs/software-engineer-jobs-in-uetersen")).toBe(false);
     expect(isLikelyJobUrl("https://www.xing.com/jobs/wedel-software-engineer-architektur-156898902")).toBe(true);
+  });
+
+  it("does not leak unrelated websites into a source-specific discovery group", async () => {
+    const fake: SearchDiscoveryProvider = {
+      id: "fake",
+      async search() {
+        return [{
+          title: "Software Engineer English-speaking jobs in Germany",
+          url: "https://englishjobs.de/jobs/software_engineer",
+          content: "Software engineering jobs in Germany",
+          score: 0.9,
+        }];
+      },
+    };
+
+    const provider = createDiscoveryJobProvider(fake);
+    const jobs = await provider.search(query({ providers: ["linkedin"] }));
+    expect(jobs).toEqual([]);
   });
 });

@@ -41,6 +41,32 @@ describe("search discovery fallback", () => {
     expect(results).toHaveLength(2);
   });
 
+  it("never loses a posting date when the same job is returned by both indexes", async () => {
+    const url = "https://www.linkedin.com/jobs/view/embedded-software-engineer-at-example-4410824998";
+    const primarySearch = vi.fn(async () => [{
+      title: "Example hiring Embedded Software Engineer in Germany | LinkedIn",
+      url,
+      content: "A much longer undated snippet about embedded software development, firmware, RTOS, C++, automotive systems and validation responsibilities.".repeat(5),
+      score: 0.95,
+    }]);
+    const fallbackSearch = vi.fn(async () => [{
+      title: "Embedded Software Engineer | LinkedIn",
+      url,
+      content: "2 days ago",
+      publishedDate: "2026-08-16T10:00:00.000Z",
+      score: 0.4,
+    }]);
+    const primary: SearchDiscoveryProvider = { id: "tavily", search: primarySearch };
+    const fallback: SearchDiscoveryProvider = { id: "serper", search: fallbackSearch };
+    const provider = createFallbackSearchDiscoveryProvider([primary, fallback]);
+
+    const results = await provider.search("Embedded Software Engineer Germany", options);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].publishedDate).toBe("2026-08-16T10:00:00.000Z");
+    expect(results[0].content?.length).toBeGreaterThan(200);
+  });
+
   it.each(["stepstone.de", "xing.com"])("queries both indexes for %s instead of letting one index suppress the other", async (domain) => {
     const primarySearch = vi.fn(async () => []);
     const fallbackSearch = vi.fn(async () => []);

@@ -1,0 +1,7 @@
+# Supabase Edge Function configuration.
+# parse-cv validates the caller's Supabase Auth access token inside the handler
+# with auth.getUser(token), so platform verify_jwt is intentionally disabled.
+# This is required for compatibility with the project's sb_publishable_* key setup.
+
+[functions.parse-cv]
+verify_jwt = false

@@ -108,7 +108,10 @@ function mergeProviderHealth(normal: ProviderHealth[], llm: ProviderHealth[]): P
 function rankWithProfile(profile: CandidateProfile | undefined, jobs: Array<NormalizedJob & { searchOrigin: SearchOrigin }>) {
   if (!profile) return jobs.map((job) => ({ job, match: undefined as MatchResult | undefined }));
   const origin = new Map(jobs.map((job) => [job.id, job.searchOrigin]));
-  return rankJobs(profile, jobs).map(({ job, match }) => ({ job: { ...job, searchOrigin: origin.get(job.id) ?? "normal" as SearchOrigin }, match }));
+  return rankJobs(profile, jobs).map(({ job, match }) => ({
+    job: { ...job, searchOrigin: origin.get(job.id) ?? ("normal" as SearchOrigin) },
+    match,
+  }));
 }
 
 export async function POST(request: Request) {
@@ -149,7 +152,7 @@ export async function POST(request: Request) {
 
     const normalJobs = normalResult.jobs.filter((job) => jobMatchesQuery(job, baseQuery));
     const llmJobs = (llmResult?.jobs ?? []).filter((job) => jobMatchesQuery(job, llmQuery ?? baseQuery) && jobMatchesQuery(job, strictQuery));
-    let combined = mergeSearchResults(normalJobs, llmJobs).filter((job) => jobMatchesQuery(job, strictQuery));
+    const combined = mergeSearchResults(normalJobs, llmJobs).filter((job) => jobMatchesQuery(job, strictQuery));
 
     const prelim = rankWithProfile(profile, combined);
     const assessmentCandidates = prelim.slice(0, 24).map(({ job }) => job);
@@ -178,8 +181,6 @@ export async function POST(request: Request) {
       warnings.push("Minimum CV match requires a completed candidate profile, so that filter was not applied.");
     }
 
-    // Final fail-closed factual validation after every AI step. LLM output can affect
-    // search semantics and ranking only; it cannot override factual filters.
     jobs = jobs.filter((job) => jobMatchesQuery(job, strictQuery));
     jobs.sort((a, b) => (b.hybridScore ?? b.match?.score ?? 0) - (a.hybridScore ?? a.match?.score ?? 0));
     jobs = jobs.slice(0, baseQuery.limit);

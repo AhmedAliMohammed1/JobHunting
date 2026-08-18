@@ -2,6 +2,7 @@ type PageJobMetadata = {
   title?: string;
   company?: string;
   location?: string;
+  country?: string;
   datePosted?: string;
   description?: string;
   employmentType?: string;
@@ -44,12 +45,33 @@ function companyName(value: unknown): string | undefined {
   return text((value as JsonObject).name);
 }
 
-function addressText(value: unknown): string | undefined {
+function countryText(value: unknown): string | undefined {
+  const direct = text(value);
+  if (direct) return direct;
   if (!value || typeof value !== "object") return undefined;
   const object = value as JsonObject;
-  const address = object.address && typeof object.address === "object" ? object.address as JsonObject : object;
-  return [address.addressLocality, address.addressRegion, address.addressCountry]
+  return text(object.name) ?? text(object.addressCountry);
+}
+
+function addressObject(value: unknown): JsonObject | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const object = value as JsonObject;
+  if (object.address && typeof object.address === "object") return object.address as JsonObject;
+  return object;
+}
+
+function addressCountry(value: unknown): string | undefined {
+  const address = addressObject(value);
+  return countryText(address?.addressCountry);
+}
+
+function addressText(value: unknown): string | undefined {
+  const address = addressObject(value);
+  if (!address) return undefined;
+  const country = countryText(address.addressCountry);
+  return [address.addressLocality, address.addressRegion]
     .map(text)
+    .concat(country ? [country] : [])
     .filter((part): part is string => Boolean(part))
     .filter((part, index, all) => all.indexOf(part) === index)
     .join(", ") || undefined;
@@ -61,6 +83,26 @@ function jobLocation(value: unknown): string | undefined {
     return [...new Set(locations)].join(" / ") || undefined;
   }
   return addressText(value);
+}
+
+function jobCountry(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const countries = value.map(addressCountry).filter((part): part is string => Boolean(part));
+    return [...new Set(countries)].join(" / ") || undefined;
+  }
+  return addressCountry(value);
+}
+
+function requirementCountry(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const countries = value.map(requirementCountry).filter((part): part is string => Boolean(part));
+    return [...new Set(countries)].join(" / ") || undefined;
+  }
+  const direct = countryText(value);
+  if (direct) return direct;
+  if (!value || typeof value !== "object") return undefined;
+  const object = value as JsonObject;
+  return countryText(object.addressCountry) ?? countryText(object.name);
 }
 
 function normalizeEmploymentType(value: unknown): string | undefined {
@@ -98,6 +140,7 @@ function parseJsonLd(html: string): PageJobMetadata | undefined {
         title: text(posting.title),
         company: companyName(posting.hiringOrganization),
         location: jobLocation(posting.jobLocation),
+        country: jobCountry(posting.jobLocation) ?? requirementCountry(posting.applicantLocationRequirements),
         datePosted: text(posting.datePosted),
         description: text(posting.description),
         employmentType: normalizeEmploymentType(posting.employmentType),
@@ -171,7 +214,7 @@ function embeddedDate(html: string): string | undefined {
     if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
   }
 
-  return undefined;
+  return canonicalMeta(html, "article:published_time") ?? canonicalMeta(html, "date");
 }
 
 function visibleText(html: string): string {
@@ -205,7 +248,7 @@ function visibleSeniority(html: string): string | undefined {
 
 export async function fetchPublicJobPageMetadata(url: string, signal?: AbortSignal): Promise<PageJobMetadata> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2_500);
+  const timeout = setTimeout(() => controller.abort(), 4_000);
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
 

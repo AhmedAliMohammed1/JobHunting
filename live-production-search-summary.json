@@ -1,0 +1,127 @@
+{
+  "testedAt": "2026-08-18T00:28:27Z",
+  "query": "Software Engineer Germany last 7 days",
+  "all": {
+    "jobCount": 43,
+    "partial": false,
+    "providers": [
+      {
+        "providerId": "arbeitnow",
+        "ok": true,
+        "jobsReturned": 8,
+        "errorCode": null
+      },
+      {
+        "providerId": "remote-ok",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      },
+      {
+        "providerId": "adzuna",
+        "ok": true,
+        "jobsReturned": 32,
+        "errorCode": null
+      },
+      {
+        "providerId": "jooble",
+        "ok": true,
+        "jobsReturned": 3,
+        "errorCode": null
+      },
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 3,
+        "errorCode": null
+      }
+    ],
+    "countsBySource": [
+      {
+        "provider": "adzuna",
+        "count": 30
+      },
+      {
+        "provider": "arbeitnow",
+        "count": 7
+      },
+      {
+        "provider": "jooble",
+        "count": 3
+      },
+      {
+        "provider": "stepstone",
+        "count": 3
+      }
+    ]
+  },
+  "linkedin": {
+    "jobCount": 0,
+    "partial": false,
+    "providerHealth": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "sampleUrls": []
+  },
+  "indeed": {
+    "jobCount": 0,
+    "partial": false,
+    "providerHealth": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "sampleUrls": []
+  },
+  "xing": {
+    "jobCount": 0,
+    "partial": false,
+    "providerHealth": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "sampleUrls": []
+  },
+  "stepstone": {
+    "jobCount": 3,
+    "partial": false,
+    "providerHealth": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 3,
+        "errorCode": null
+      }
+    ],
+    "sampleUrls": [
+      "https://www.stepstone.de/stellenangebote--software-engineer-security-full-time-ulm-germany-noelscher-consulting-gmbh--12390572-inline.html?cid=partner_togetherabroad___SP&adjust_t=1bbth7ql_1bjy99sm&adjust_campaign=partner_togetherabroad___SP",
+      "https://www.stepstone.de/stellenangebote--Senior-Software-Engineer-Java-f-m-d-Berlin-Berlin-Germany;-Muenchen-Bavaria-Germany-IDnow-GmbH--13303206-inline.html",
+      "https://www.stepstone.de/stellenangebote--Embedded-Software-Engineer-m-f-d-Berlin-Germany-Novanta--13418595-inline.html"
+    ]
+  },
+  "glassdoor": {
+    "jobCount": 0,
+    "partial": false,
+    "providerHealth": [
+      {
+        "providerId": "web-discovery",
+        "ok": true,
+        "jobsReturned": 0,
+        "errorCode": null
+      }
+    ],
+    "sampleUrls": []
+  }
+}

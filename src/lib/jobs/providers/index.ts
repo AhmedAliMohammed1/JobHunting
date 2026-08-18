@@ -2,13 +2,15 @@ import { effectiveJobProviderMode, getServerEnv } from "@/src/config/env";
 import type { JobProvider, JobSearchQuery } from "@/src/types/jobs";
 import { arbeitnowProvider } from "./arbeitnow";
 import { createAdzunaProvider } from "./adzuna";
+import { createBraveSearchProvider } from "./brave";
 import { createJoobleProvider } from "./jooble";
 import { mockJobProvider } from "./mock";
 import { remoteOkProvider } from "./remote-ok";
 import { remotiveProvider } from "./remotive";
 import { createCareerRegistryProvider } from "./ats";
 import { parseCareerSources } from "./career-sources";
-import { createDiscoveryJobProvider, createTavilySearchProvider, DISCOVERY_SOURCE_IDS } from "./discovery";
+import { createDiscoveryJobProvider, createTavilySearchProvider, DISCOVERY_SOURCE_IDS, type SearchDiscoveryProvider } from "./discovery";
+import { createFallbackSearchDiscoveryProvider } from "./search-discovery-fallback";
 
 const ATS_SOURCE_IDS = new Set(["greenhouse", "lever", "ashby", "smartrecruiters", "personio", "workday", "sap-successfactors"]);
 
@@ -35,7 +37,12 @@ export function configuredJobProviders(query?: Pick<JobSearchQuery, "providers">
   }));
   if (env.JOOBLE_API_KEY) providers.push(createJoobleProvider(env.JOOBLE_API_KEY));
   if (careerSources.length) providers.push(createCareerRegistryProvider(careerSources));
-  if (env.TAVILY_API_KEY) providers.push(createDiscoveryJobProvider(createTavilySearchProvider(env.TAVILY_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS)));
+
+  const discoveryProviders: SearchDiscoveryProvider[] = [];
+  if (env.TAVILY_API_KEY) discoveryProviders.push(createTavilySearchProvider(env.TAVILY_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS));
+  if (env.BRAVE_SEARCH_API_KEY) discoveryProviders.push(createBraveSearchProvider(env.BRAVE_SEARCH_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS));
+  if (discoveryProviders.length) providers.push(createDiscoveryJobProvider(createFallbackSearchDiscoveryProvider(discoveryProviders)));
+
   if (env.ENABLE_REMOTIVE === "true") providers.push(remotiveProvider);
 
   const requested = query?.providers ?? [];

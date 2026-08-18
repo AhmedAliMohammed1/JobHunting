@@ -4,7 +4,7 @@ import { createSerperSearchProvider } from "@/src/lib/jobs/providers/serper";
 describe("Serper discovery adapter", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("uses server-side auth, Google site operators, country, language and recency", async () => {
+  it("uses server-side auth, Google site operators, country, language and recency without treating rank as relevance", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     fetchMock.mockResolvedValue(new Response(JSON.stringify({
       organic: [{
@@ -12,7 +12,7 @@ describe("Serper discovery adapter", () => {
         link: "https://de.linkedin.com/jobs/view/software-engineer-at-contabo-4410824202",
         snippet: "Build cloud software in Germany.",
         date: "2 days ago",
-        position: 1,
+        position: 9,
       }],
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
@@ -39,6 +39,7 @@ describe("Serper discovery adapter", () => {
     expect(results).toHaveLength(1);
     expect(results[0].url).toContain("linkedin.com/jobs/view");
     expect(results[0].content).toContain("2 days ago");
+    expect(results[0].score).toBeUndefined();
   });
 
   it("throws a provider error for non-success Serper responses", async () => {

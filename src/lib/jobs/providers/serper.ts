@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { inferDiscoveryPostedAt } from "../discovery-metadata";
 import type { SearchDiscoveryProvider } from "./discovery";
 
 const serperResponseSchema = z.object({
@@ -85,7 +86,9 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
         title: result.title,
         url: result.link,
         content: [result.snippet ?? "", result.date ?? ""].filter(Boolean).join(" "),
-        publishedDate: result.date ?? undefined,
+        // Normalize Google's dedicated result date before downstream parsing so
+        // unrelated dates inside LinkedIn/Indeed snippets cannot win by accident.
+        publishedDate: inferDiscoveryPostedAt(result.date ?? undefined, undefined),
       }));
       cache.set(key, { expiresAt: Date.now() + cacheTtlSeconds * 1_000, value });
       return value;

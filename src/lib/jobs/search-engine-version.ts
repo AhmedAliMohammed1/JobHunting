@@ -1,1 +1,1 @@
-export const SEARCH_ENGINE_VERSION = "2026-08-18-r4";
+export const SEARCH_ENGINE_VERSION = "2026-08-18-r5-hybrid";

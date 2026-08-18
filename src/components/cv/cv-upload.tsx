@@ -27,7 +27,10 @@ export function CvUpload() {
     else setMessage(body.error ?? "Could not load CVs.");
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function processDocument(id: string) {
     setProcessingId(id);

@@ -6,15 +6,17 @@ describe("Serper discovery adapter", () => {
 
   it("uses server-side auth, Google site operators, country, language and recency while capping results at ten", async () => {
     const fetchMock = vi.fn<typeof fetch>();
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({
-      organic: [{
-        title: "Contabo sucht Software Engineer in Deutschland | LinkedIn",
-        link: "https://de.linkedin.com/jobs/view/software-engineer-at-contabo-4410824202",
-        snippet: "Build cloud software in Germany.",
-        date: "2 days ago",
-        position: 9,
-      }],
-    }), { status: 200, headers: { "content-type": "application/json" } }));
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        organic: [{
+          title: "Contabo sucht Software Engineer in Deutschland | LinkedIn",
+          link: "https://de.linkedin.com/jobs/view/software-engineer-at-contabo-4410824202",
+          snippet: "Build cloud software in Germany.",
+          date: "2 days ago",
+          position: 9,
+        }],
+      }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("<html><head></head><body></body></html>", { status: 200, headers: { "content-type": "text/html" } }));
     vi.stubGlobal("fetch", fetchMock);
 
     const provider = createSerperSearchProvider("serper-secret-key", 600);
@@ -24,7 +26,7 @@ describe("Serper discovery adapter", () => {
       maxResults: 20,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [requestUrl, requestInit] = fetchMock.mock.calls[0];
     expect(String(requestUrl)).toBe("https://google.serper.dev/search");
     expect(requestInit?.headers).toMatchObject({ "X-API-KEY": "serper-secret-key", "Content-Type": "application/json" });
@@ -36,6 +38,7 @@ describe("Serper discovery adapter", () => {
     expect(body.hl).toBe("en");
     expect(body.tbs).toBe("qdr:w");
     expect(body.num).toBe(10);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("linkedin.com/jobs/view");
     expect(results).toHaveLength(1);
     expect(results[0].url).toContain("linkedin.com/jobs/view");
     expect(results[0].content).toContain("2 days ago");

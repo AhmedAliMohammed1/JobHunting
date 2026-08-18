@@ -24,11 +24,11 @@ export const DISCOVERY_SOURCE_IDS: DiscoverySourceId[] = [
 ];
 
 const SOURCE_DOMAINS: Record<Exclude<DiscoverySourceId, "career-page">, string[]> = {
-  linkedin: ["linkedin.com/jobs/view", "de.linkedin.com/jobs/view"],
-  indeed: ["indeed.com/viewjob", "de.indeed.com/viewjob", "indeed.com/pagead", "de.indeed.com/pagead"],
-  stepstone: ["stepstone.de/stellenangebote--"],
-  xing: ["xing.com/jobs"],
-  glassdoor: ["glassdoor.com/job-listing", "glassdoor.de/job-listing", "glassdoor.com/partner/joblisting", "glassdoor.de/partner/joblisting"],
+  linkedin: ["linkedin.com", "de.linkedin.com"],
+  indeed: ["indeed.com", "de.indeed.com"],
+  stepstone: ["stepstone.de"],
+  xing: ["xing.com"],
+  glassdoor: ["glassdoor.com", "glassdoor.de"],
   greenhouse: ["boards.greenhouse.io", "job-boards.greenhouse.io"],
   lever: ["jobs.lever.co"],
   ashby: ["jobs.ashbyhq.com"],
@@ -330,9 +330,11 @@ function providerGroups(query: JobSearchQuery): DiscoveryGroup[] {
   return groups;
 }
 
-function validDiscoveryResult(result: DiscoveryResult): boolean {
+function validDiscoveryResult(result: DiscoveryResult, expectedSource?: DiscoverySourceId): boolean {
   if ((result.score ?? 1) < 0.25 || !isLikelyJobUrl(result.url)) return false;
   const source = detectJobSource(result.url);
+  if (expectedSource && source !== expectedSource) return false;
+  if (!expectedSource && !detectATS(result.url)) return false;
   return !(source === "career-page" && isGenericCareerTitle(cleanResultTitle(result.title)));
 }
 
@@ -343,7 +345,7 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
     sourceType: "search-discovery",
     async search(query, signal) {
       const groups = providerGroups(query);
-      const perSourceLimit = Math.min(15, Math.max(8, Math.ceil(query.limit / Math.max(1, groups.length))));
+      const perSourceLimit = Math.min(12, Math.max(8, Math.ceil(query.limit / Math.max(1, groups.length))));
       const settled = await Promise.allSettled(groups.map(async (group) => {
         const input = {
           source: group.source,
@@ -361,15 +363,12 @@ export function createDiscoveryJobProvider(searchProvider: SearchDiscoveryProvid
           : buildSearchQuery(input);
         const searchDepth = ADVANCED_DISCOVERY_SOURCES.has(group.source as DiscoverySourceId) ? "advanced" : "basic";
 
-        // Do not apply Tavily's start_date to job boards: that date reflects page indexing/update
-        // metadata and can hide active dynamic job pages. Recency is expressed in the query and
-        // enforced later whenever the source exposes a usable posting date.
         const rows = await searchProvider.search(searchQuery, {
           includeDomains: group.domains,
-          maxResults: group.source ? Math.max(12, perSourceLimit) : perSourceLimit,
+          maxResults: group.source ? 12 : perSourceLimit,
           searchDepth,
         }, signal);
-        return rows.filter(validDiscoveryResult);
+        return rows.filter((result) => validDiscoveryResult(result, group.source));
       }));
       if (settled.every((result) => result.status === "rejected")) throw new Error("All discovery searches failed");
       const rows = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);

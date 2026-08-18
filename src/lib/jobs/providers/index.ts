@@ -10,6 +10,7 @@ import { createCareerRegistryProvider } from "./ats";
 import { parseCareerSources } from "./career-sources";
 import { createDiscoveryJobProvider, createTavilySearchProvider, DISCOVERY_SOURCE_IDS, type SearchDiscoveryProvider } from "./discovery";
 import { createFallbackSearchDiscoveryProvider } from "./search-discovery-fallback";
+import { withDefaultDiscoveryRecency } from "./search-discovery-reliability";
 import { createSerperSearchProvider } from "./serper";
 
 const ATS_SOURCE_IDS = new Set(["greenhouse", "lever", "ashby", "smartrecruiters", "personio", "workday", "sap-successfactors"]);
@@ -22,7 +23,7 @@ function providerSelected(provider: JobProvider, requested: string[]): boolean {
   return false;
 }
 
-export function configuredJobProviders(query?: Pick<JobSearchQuery, "providers">): JobProvider[] {
+export function configuredJobProviders(query?: Pick<JobSearchQuery, "providers" | "postedWithinHours">): JobProvider[] {
   const env = getServerEnv();
   if (effectiveJobProviderMode(env) === "mock") return [mockJobProvider];
   const providers: JobProvider[] = [];
@@ -39,8 +40,15 @@ export function configuredJobProviders(query?: Pick<JobSearchQuery, "providers">
   if (careerSources.length) providers.push(createCareerRegistryProvider(careerSources));
 
   const discoveryProviders: SearchDiscoveryProvider[] = [];
-  if (env.TAVILY_API_KEY) discoveryProviders.push(createTavilySearchProvider(env.TAVILY_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS));
-  if (env.SERPER_API_KEY) discoveryProviders.push(createSerperSearchProvider(env.SERPER_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS));
+  const defaultRecency = query?.postedWithinHours;
+  if (env.TAVILY_API_KEY) discoveryProviders.push(withDefaultDiscoveryRecency(
+    createTavilySearchProvider(env.TAVILY_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS),
+    defaultRecency,
+  ));
+  if (env.SERPER_API_KEY) discoveryProviders.push(withDefaultDiscoveryRecency(
+    createSerperSearchProvider(env.SERPER_API_KEY, env.SEARCH_DISCOVERY_CACHE_TTL_SECONDS),
+    defaultRecency,
+  ));
   if (discoveryProviders.length) providers.push(createDiscoveryJobProvider(createFallbackSearchDiscoveryProvider(discoveryProviders)));
 
   if (env.ENABLE_REMOTIVE === "true") providers.push(remotiveProvider);

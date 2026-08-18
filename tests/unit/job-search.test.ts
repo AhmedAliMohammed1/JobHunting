@@ -64,4 +64,13 @@ describe("job search result filtering", () => {
     expect(jobMatchesQuery(job, query({ minimumSalary: 120_000 }), now)).toBe(false);
     expect(jobMatchesQuery({ ...job, postedAt: undefined, salaryMin: undefined, salaryMax: undefined }, query({ postedWithinHours: 24, minimumSalary: 1 }), now)).toBe(false);
   });
+
+  it("never loses an already-recent job when the freshness window is widened", () => {
+    expect(jobMatchesQuery(job, query({ postedWithinHours: 24 }), now)).toBe(true);
+    expect(jobMatchesQuery(job, query({ postedWithinHours: 72 }), now)).toBe(true);
+
+    const twoDaysOld = { ...job, postedAt: "2026-08-15T12:00:00.000Z" };
+    expect(jobMatchesQuery(twoDaysOld, query({ postedWithinHours: 24 }), now)).toBe(false);
+    expect(jobMatchesQuery(twoDaysOld, query({ postedWithinHours: 72 }), now)).toBe(true);
+  });
 });

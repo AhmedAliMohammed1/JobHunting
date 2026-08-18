@@ -68,7 +68,9 @@ export async function POST(request: Request) {
     }
     const disclosure = result.providers.some((provider) => provider.providerId === "mock")
       ? "Development fixtures — not live listings."
-      : `${jobs.length} live listing${jobs.length === 1 ? "" : "s"} matched across ${result.providers.length} source${result.providers.length === 1 ? "" : "s"}.`;
+      : result.totalMatches > jobs.length
+        ? `${result.totalMatches} unique live listings matched across ${result.providers.length} source pipelines. Showing the top ${jobs.length} after ranking and filters.`
+        : `${jobs.length} unique live listing${jobs.length === 1 ? "" : "s"} matched across ${result.providers.length} source pipeline${result.providers.length === 1 ? "" : "s"}.`;
     return NextResponse.json({
       jobs,
       providers: result.providers.map(({ health }) => health),
@@ -76,6 +78,8 @@ export async function POST(request: Request) {
       interpretedQuery: query,
       warnings,
       disclosure,
+      totalMatches: result.totalMatches,
+      sourceBreakdown: result.sourceBreakdown,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed." }, { status: 400 });

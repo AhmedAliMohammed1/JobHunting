@@ -40,18 +40,18 @@ function mergeByStableJob(current: Results, incoming: Results): Results {
   return [...byKey.values()];
 }
 
-function shouldAlwaysTryFallback(domains: string[] | undefined): boolean {
+function shouldAggregateIndexes(domains: string[] | undefined): boolean {
   const text = (domains ?? []).join(" ").toLowerCase();
-  // These sources frequently expose thin/stale search snippets. Query both indexes
-  // and let the richer record win rather than stopping at the first URL-shaped hit.
-  return /linkedin|indeed|glassdoor/.test(text);
+  // Major boards are indexed differently by Tavily and Google. Query both in
+  // parallel so a thin/stale index cannot suppress valid listings from the other.
+  return /linkedin|indeed|glassdoor|stepstone|xing/.test(text);
 }
 
 function hasUsableResult(results: Results, domains: string[] | undefined): boolean {
   const stable = stableResults(results);
   if (!stable.length) return false;
   if (!domains?.length) return false;
-  if (shouldAlwaysTryFallback(domains)) return false;
+  if (shouldAggregateIndexes(domains)) return false;
 
   return stable.some((result) =>
     (result.score ?? 1) >= 0.25
@@ -66,6 +66,21 @@ export function createFallbackSearchDiscoveryProvider(providers: SearchDiscovery
   return {
     id: providers.map((provider) => provider.id).join("->"),
     async search(query, options, signal) {
+      if (shouldAggregateIndexes(options.includeDomains)) {
+        const settled = await Promise.allSettled(providers.map((provider) => provider.search(query, options, signal)));
+        let combined: Results = [];
+        let lastError: unknown;
+
+        for (const result of settled) {
+          if (result.status === "fulfilled") combined = mergeByStableJob(combined, stableResults(result.value));
+          else lastError = result.reason;
+        }
+
+        if (combined.length) return combined;
+        if (lastError) throw lastError;
+        return [];
+      }
+
       let combined: Results = [];
       let lastError: unknown;
 

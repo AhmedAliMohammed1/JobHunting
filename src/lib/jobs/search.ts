@@ -9,6 +9,8 @@ export interface AggregatedSearchResult {
   jobs: NormalizedJob[];
   providers: ProviderSearchResult[];
   partial: boolean;
+  totalMatches: number;
+  sourceBreakdown: Record<string, number>;
 }
 
 const PRIORITY_JOB_SOURCES = new Map<string, number>([
@@ -111,9 +113,6 @@ export function providerPriority(job: Pick<NormalizedJob, "provider">): number {
 
 export function rankWithoutProfile(jobs: NormalizedJob[], query: JobSearchQuery): NormalizedJob[] {
   return [...jobs].sort((a, b) => {
-    // LinkedIn, Indeed and XING are deliberately favored for fresh-job discovery.
-    // Relevance and recency remain the majority of the score so unrelated jobs
-    // from a priority source cannot outrank a clearly matching role.
     const score = (job: NormalizedJob) =>
       0.45 * lexicalScore(job, query)
       + 0.25 * recencyScore(job)
@@ -127,7 +126,8 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
   const providers = configuredJobProviders(query);
   const settled = await Promise.allSettled(providers.map(async (provider): Promise<ProviderSearchResult> => {
     const started = Date.now();
-    const jobs = await withRetry((signal) => provider.search(query, signal), { attempts: 1, timeoutMs: 8_000 });
+    const timeoutMs = provider.id === "web-discovery" ? 15_000 : 10_000;
+    const jobs = await withRetry((signal) => provider.search(query, signal), { attempts: 1, timeoutMs });
     return {
       providerId: provider.id,
       jobs,
@@ -147,6 +147,26 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
     return { ...result, jobs, health: { ...result.health, jobsReturned: jobs.length } };
   });
   const deduplicated = deduplicateJobs(filteredResults.flatMap((result) => result.jobs)).map((job) => withFreshness(job));
-  const jobs = rankWithoutProfile(deduplicated, query).slice(0, query.limit);
-  return { jobs, providers: filteredResults, partial: settled.some((result) => result.status === "rejected") };
+  const ranked = rankWithoutProfile(deduplicated, query);
+  const sourceBreakdown = ranked.reduce<Record<string, number>>((counts, job) => {
+    counts[job.provider] = (counts[job.provider] ?? 0) + 1;
+    return counts;
+  }, {});
+  const jobs = ranked.slice(0, query.limit);
+
+  log("info", "job_search_completed", {
+    requestedLimit: query.limit,
+    totalMatches: ranked.length,
+    returned: jobs.length,
+    sourceBreakdown,
+    providerRows: Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length])),
+  });
+
+  return {
+    jobs,
+    providers: filteredResults,
+    partial: settled.some((result) => result.status === "rejected"),
+    totalMatches: ranked.length,
+    sourceBreakdown,
+  };
 }

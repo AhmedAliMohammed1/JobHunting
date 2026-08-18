@@ -27,7 +27,7 @@ export function createJoobleProvider(apiKey: string): JobProvider {
         signal,
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          keywords: [...query.roles, ...query.keywords].slice(0, 5).join(" "),
+          keywords: [query.roles[0], ...query.keywords].filter(Boolean).slice(0, 4).join(" "),
           location: [...query.locations, ...query.countries].slice(0, 2).join(", "),
           salary: query.minimumSalary,
           page: 1,

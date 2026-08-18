@@ -15,10 +15,11 @@ class FixtureProvider implements AIProvider {
 }
 
 describe("AI boundary and truthfulness helpers", () => {
-  it("parses bounded candidate facts and preserves manual edits", async () => {
-    const fixture = { fullName: "Sam", currentTitle: "Engineer", location: "Cairo", skills: ["TypeScript"], programmingLanguages: ["TypeScript"], frameworks: ["Next.js"], tools: ["Git"], education: [], employment: [], projects: [], certifications: [], languages: [{ name: "English", level: "C1" }], yearsExperience: 4 };
+  it("parses bounded candidate facts and preserves meaningful manual edits", async () => {
+    const fixture = { fullName: "Sam", currentTitle: "Engineer", location: "Cairo", summary: "Software engineer focused on reliable systems.", skills: ["TypeScript"], programmingLanguages: ["TypeScript"], frameworks: ["Next.js"], tools: ["Git"], education: [], employment: [], projects: [], certifications: [], languages: [{ name: "English", level: "C1" }], yearsExperience: 4 };
     expect((await parseCandidateText(new FixtureProvider(fixture), "CV text")).fullName).toBe("Sam");
     expect(mergeAuthoritativeProfile({ fullName: "Manual", location: "Old" }, { fullName: "Parsed", location: "New" }, ["fullName"])).toEqual({ fullName: "Manual", location: "New" });
+    expect(mergeAuthoritativeProfile({ fullName: "" }, { fullName: "Parsed" }, ["fullName"])).toEqual({ fullName: "Parsed" });
     await expect(parseCandidateText(new FixtureProvider(fixture), "x".repeat(120_001))).rejects.toThrow(/safe parsing limit/i);
   });
 

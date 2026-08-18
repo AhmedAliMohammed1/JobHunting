@@ -15,8 +15,17 @@ function hasUsableResult(
   domains: string[] | undefined,
 ): boolean {
   if (!results.length) return false;
-  if (!domains?.length) return true;
-  return results.some((result) => isLikelyJobUrl(result.url) && domains.some((domain) => hostnameMatchesDomain(result.url, domain)));
+
+  // Domainless discovery is deliberately used as a recovery path. Without an
+  // expected domain, this layer cannot know whether a result belongs to the
+  // requested source, so continue through the provider chain and merge results.
+  if (!domains?.length) return false;
+
+  return results.some((result) =>
+    (result.score ?? 1) >= 0.25
+    && isLikelyJobUrl(result.url)
+    && domains.some((domain) => hostnameMatchesDomain(result.url, domain)),
+  );
 }
 
 function mergeByUrl(

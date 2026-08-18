@@ -3,7 +3,24 @@ import type { JobSearchQuery, WorkplaceType } from "@/src/types/jobs";
 type SearchIntent = Partial<Omit<JobSearchQuery, "limit">>;
 
 const ROLE_FAMILIES: Array<{ pattern: RegExp; roles: string[] }> = [
-  { pattern: /\b(?:embedded|firmware|microcontroller|rtos|real[ -]?time system)\b/i, roles: ["Embedded Software Engineer", "Embedded Systems Engineer", "Firmware Engineer", "Embedded Developer", "Embedded C++ Engineer"] },
+  {
+    pattern: /\b(?:embedded|firmware|microcontroller|rtos|real[ -]?time system)\b/i,
+    roles: [
+      "Embedded Software Engineer",
+      "Embedded Softwareentwickler",
+      "Firmware Engineer",
+      "Firmwareentwickler",
+      "Embedded Systems Engineer",
+      "Embedded Software Developer",
+      "Embedded Developer",
+      "Embedded C++ Engineer",
+      "Embedded Linux Engineer",
+      "Embedded Test Engineer",
+      "Embedded Software Test Engineer",
+      "Embedded Software Architect",
+      "Entwicklungsingenieur Embedded Software",
+    ],
+  },
   { pattern: /\b(?:artificial intelligence|ai|ki|künstliche intelligenz|llm|large language model|nlp|natural language processing)\b/i, roles: ["AI Engineer", "Machine Learning Engineer", "NLP Engineer", "LLM Engineer", "Applied AI Engineer", "Generative AI Engineer", "AI Software Engineer", "ML Engineer"] },
   { pattern: /\bmachine learning\b|\bml engineer/i, roles: ["Machine Learning Engineer", "ML Engineer", "Applied Scientist"] },
   { pattern: /\bdata scien(?:ce|tist)\b/i, roles: ["Data Scientist", "Machine Learning Engineer", "Applied Scientist"] },

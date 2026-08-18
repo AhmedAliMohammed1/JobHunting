@@ -22,10 +22,29 @@ function metadataScore(result: Results[number]): number {
   const content = result.content?.trim() ?? "";
   let score = Math.min(content.length, 800) / 80;
   if (title.length > 8) score += 2;
-  if (result.publishedDate) score += 3;
+  // A verified/index-provided posting date is more important than a longer
+  // snippet. Losing this field later causes strict 24h/72h filters to discard
+  // an otherwise valid listing.
+  if (result.publishedDate) score += 25;
   if (/\b(?:hiring|sucht|at|bei)\b/i.test(title)) score += 2;
   if (/\b(?:Germany|Deutschland|Berlin|Munich|München|Hamburg|Frankfurt|Cologne|Köln|Stuttgart|Remote)\b/i.test(`${title} ${content}`)) score += 1;
   return score;
+}
+
+function mergeResultMetadata(left: Results[number], right: Results[number]): Results[number] {
+  const preferred = metadataScore(right) >= metadataScore(left) ? right : left;
+  const other = preferred === right ? left : right;
+  const richerContent = (preferred.content?.length ?? 0) >= (other.content?.length ?? 0) ? preferred.content : other.content;
+  return {
+    ...other,
+    ...preferred,
+    title: preferred.title || other.title,
+    content: richerContent,
+    publishedDate: preferred.publishedDate ?? other.publishedDate,
+    employmentType: preferred.employmentType ?? other.employmentType,
+    seniority: preferred.seniority ?? other.seniority,
+    score: Math.max(preferred.score ?? 0, other.score ?? 0) || undefined,
+  };
 }
 
 function mergeByStableJob(current: Results, incoming: Results): Results {
@@ -35,7 +54,7 @@ function mergeByStableJob(current: Results, incoming: Results): Results {
     if (!canonical) continue;
     const key = canonical.sourceId ? `${new URL(canonical.url).hostname}:${canonical.sourceId}` : canonical.url;
     const existing = byKey.get(key);
-    if (!existing || metadataScore(result) >= metadataScore(existing)) byKey.set(key, result);
+    byKey.set(key, existing ? mergeResultMetadata(existing, result) : result);
   }
   return [...byKey.values()];
 }

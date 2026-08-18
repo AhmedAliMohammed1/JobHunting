@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { expandSearchQuery } from "@/src/lib/ai/query-expansion";
 import { getAIProvider } from "@/src/lib/ai/provider";
+import {
+  assessJobsWithLLM,
+  buildLLMSearchQuery,
+  createLLMSearchPlan,
+  hybridScore,
+  type LLMJobAssessment,
+  type LLMSearchPlan,
+} from "@/src/lib/ai/llm-job-search";
 import { jobMatchesQuery, searchJobs } from "@/src/lib/jobs/search";
 import { SEARCH_ENGINE_VERSION } from "@/src/lib/jobs/search-engine-version";
-import { interpretSearchQuery, mergeSearchIntent, shouldUseAIQueryExpansion } from "@/src/lib/jobs/query-intent";
+import { interpretSearchQuery, mergeSearchIntent } from "@/src/lib/jobs/query-intent";
 import { rankJobs } from "@/src/lib/matching/rank";
 import { rateLimit } from "@/src/lib/security/rate-limit";
 import { searchRequestSchema, jobSearchSchema } from "@/src/lib/validation/search";
@@ -11,8 +18,18 @@ import { getCurrentUser } from "@/src/lib/auth/user";
 import { createClient } from "@/src/lib/database/supabase/server";
 import { ZodError } from "zod";
 import type { CandidateProfile, CandidateSkill } from "@/src/types/candidate";
-import type { JobSearchQuery, NormalizedJob } from "@/src/types/jobs";
+import type { JobSearchQuery, NormalizedJob, ProviderHealth } from "@/src/types/jobs";
 import type { MatchResult } from "@/src/types/matching";
+
+export const maxDuration = 180;
+
+type SearchOrigin = "normal" | "llm" | "both";
+type SearchJob = NormalizedJob & {
+  match?: MatchResult;
+  searchOrigin: SearchOrigin;
+  hybridScore?: number;
+  aiAssessment?: LLMJobAssessment;
+};
 
 const privateHeaders = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -45,9 +62,58 @@ function sourceBreakdown(jobs: NormalizedJob[]): Record<string, number> {
   }, {});
 }
 
+function richerJob(left: NormalizedJob, right: NormalizedJob): NormalizedJob {
+  const quality = (job: NormalizedJob) =>
+    (job.postedAt ? 5 : 0)
+    + (job.company && !/unknown|not supplied/i.test(job.company) ? 2 : 0)
+    + Math.min((job.description ?? "").length, 1600) / 400
+    + job.skills.length / 8;
+  return quality(right) > quality(left) ? right : left;
+}
+
+function mergeSearchResults(normalJobs: NormalizedJob[], llmJobs: NormalizedJob[]): Array<NormalizedJob & { searchOrigin: SearchOrigin }> {
+  const byId = new Map<string, NormalizedJob & { searchOrigin: SearchOrigin }>();
+  for (const job of normalJobs) byId.set(job.id, { ...job, searchOrigin: "normal" });
+  for (const job of llmJobs) {
+    const existing = byId.get(job.id);
+    if (!existing) {
+      byId.set(job.id, { ...job, searchOrigin: "llm" });
+      continue;
+    }
+    byId.set(job.id, { ...richerJob(existing, job), searchOrigin: "both" });
+  }
+  return [...byId.values()];
+}
+
+function hardFilterQuery(query: JobSearchQuery): JobSearchQuery {
+  return { ...query, roles: [], keywords: [], limit: 100 };
+}
+
+function mergeProviderHealth(normal: ProviderHealth[], llm: ProviderHealth[]): ProviderHealth[] {
+  const rows = new Map<string, ProviderHealth>();
+  for (const item of [...normal, ...llm]) {
+    const existing = rows.get(item.providerId);
+    if (!existing) rows.set(item.providerId, item);
+    else rows.set(item.providerId, {
+      ...existing,
+      ok: existing.ok || item.ok,
+      latencyMs: Math.max(existing.latencyMs, item.latencyMs),
+      jobsReturned: (existing.jobsReturned ?? 0) + (item.jobsReturned ?? 0),
+      errorCode: existing.ok || item.ok ? undefined : existing.errorCode ?? item.errorCode,
+    });
+  }
+  return [...rows.values()];
+}
+
+function rankWithProfile(profile: CandidateProfile | undefined, jobs: Array<NormalizedJob & { searchOrigin: SearchOrigin }>) {
+  if (!profile) return jobs.map((job) => ({ job, match: undefined as MatchResult | undefined }));
+  const origin = new Map(jobs.map((job) => [job.id, job.searchOrigin]));
+  return rankJobs(profile, jobs).map(({ job, match }) => ({ job: { ...job, searchOrigin: origin.get(job.id) ?? "normal" as SearchOrigin }, match }));
+}
+
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const limit = rateLimit(`job-search:${forwarded ?? "anonymous"}`, 20, 60_000);
+  const limit = rateLimit(`job-search:${forwarded ?? "anonymous"}`, 12, 60_000);
   if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly.", engineVersion: SEARCH_ENGINE_VERSION }, { status: 429, headers: privateHeaders });
 
   try {
@@ -56,66 +122,117 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     const profile = user ? await loadCandidateProfile(user.id) : undefined;
     const deterministic = input.query ? interpretSearchQuery(input.query, profile?.preferredRoles ?? []) : {};
-    let expanded: Partial<JobSearchQuery> = {};
-    if (input.query && shouldUseAIQueryExpansion(input.query, deterministic)) {
+    const baseQuery = jobSearchSchema.parse(mergeSearchIntent(deterministic, {}, input.filters ?? {}));
+    const strictQuery = hardFilterQuery(baseQuery);
+    const provider = getAIProvider();
+    const warnings: string[] = [];
+
+    const normalPromise = searchJobs(baseQuery);
+    const planPromise: Promise<LLMSearchPlan | undefined> = input.query && provider.id !== "not-configured"
+      ? createLLMSearchPlan(provider, input.query, baseQuery, profile).catch(() => undefined)
+      : Promise.resolve(undefined);
+
+    const [normalResult, plan] = await Promise.all([normalPromise, planPromise]);
+
+    let llmResult: Awaited<ReturnType<typeof searchJobs>> | undefined;
+    let llmQuery: JobSearchQuery | undefined;
+    if (plan) {
+      llmQuery = jobSearchSchema.parse(buildLLMSearchQuery(baseQuery, plan));
       try {
-        expanded = await expandSearchQuery(getAIProvider(), input.query, profile?.preferredRoles ?? []);
+        llmResult = await searchJobs(llmQuery);
       } catch {
-        expanded = {};
+        warnings.push("The LLM-expanded retrieval pass was unavailable, so normal search results are shown.");
+      }
+    } else if (input.query) {
+      warnings.push("The LLM search planner was unavailable for this request; normal search still completed.");
+    }
+
+    const normalJobs = normalResult.jobs.filter((job) => jobMatchesQuery(job, baseQuery));
+    const llmJobs = (llmResult?.jobs ?? []).filter((job) => jobMatchesQuery(job, llmQuery ?? baseQuery) && jobMatchesQuery(job, strictQuery));
+    let combined = mergeSearchResults(normalJobs, llmJobs).filter((job) => jobMatchesQuery(job, strictQuery));
+
+    const prelim = rankWithProfile(profile, combined);
+    const assessmentCandidates = prelim.slice(0, 24).map(({ job }) => job);
+    let aiAssessments = new Map<string, LLMJobAssessment>();
+    if (plan && assessmentCandidates.length) {
+      try {
+        aiAssessments = await assessJobsWithLLM(provider, input.query ?? baseQuery.roles.join(" "), plan, assessmentCandidates, profile);
+      } catch {
+        warnings.push("LLM semantic reranking timed out or was unavailable; deterministic CV scoring was kept.");
       }
     }
-    const query = jobSearchSchema.parse(mergeSearchIntent(deterministic, expanded, input.filters ?? {}));
-    const result = await searchJobs(query);
-    const warnings: string[] = [];
-    let jobs: Array<NormalizedJob & { match?: MatchResult }> = result.jobs;
 
-    if (profile) {
-      jobs = rankJobs(profile, result.jobs)
-        .filter(({ match }) => query.minimumMatchScore === undefined || match.score >= query.minimumMatchScore)
-        .map(({ job, match }) => ({ ...job, match }));
-    } else if (query.minimumMatchScore !== undefined) {
-      warnings.push("Minimum match requires a completed candidate profile, so that filter was not applied.");
+    let jobs: SearchJob[] = prelim.map(({ job, match }) => {
+      const aiAssessment = aiAssessments.get(job.id);
+      return {
+        ...job,
+        match,
+        aiAssessment,
+        hybridScore: hybridScore(job, match, aiAssessment),
+      };
+    });
+
+    if (profile && baseQuery.minimumMatchScore !== undefined) {
+      jobs = jobs.filter((job) => (job.match?.score ?? 0) >= baseQuery.minimumMatchScore!);
+    } else if (!profile && baseQuery.minimumMatchScore !== undefined) {
+      warnings.push("Minimum CV match requires a completed candidate profile, so that filter was not applied.");
     }
 
-    // Final fail-closed validation immediately before serialization. This intentionally
-    // duplicates the aggregate search filter so an upstream/provider regression can
-    // never leak an undated or out-of-window job into a date-filtered response.
-    jobs = jobs.filter((job) => jobMatchesQuery(job, query));
+    // Final fail-closed factual validation after every AI step. LLM output can affect
+    // search semantics and ranking only; it cannot override factual filters.
+    jobs = jobs.filter((job) => jobMatchesQuery(job, strictQuery));
+    jobs.sort((a, b) => (b.hybridScore ?? b.match?.score ?? 0) - (a.hybridScore ?? a.match?.score ?? 0));
+    jobs = jobs.slice(0, baseQuery.limit);
 
-    if (query.postedWithinHours !== undefined) {
-      warnings.push("Date filters are strict: listings without a verifiable posting date are excluded.");
+    if (baseQuery.postedWithinHours !== undefined) {
+      warnings.push("Date filters are strict: undated and out-of-window listings are excluded even if the LLM considers them relevant.");
     }
 
+    const normalIds = new Set(normalJobs.map((job) => job.id));
+    const llmIds = new Set(llmJobs.map((job) => job.id));
+    const overlap = [...normalIds].filter((id) => llmIds.has(id)).length;
     const finalBreakdown = sourceBreakdown(jobs);
+    const normalBreakdown = sourceBreakdown(normalJobs);
+    const llmBreakdown = sourceBreakdown(llmJobs);
+    const mergedHealth = mergeProviderHealth(
+      normalResult.providers.map(({ health }) => health),
+      (llmResult?.providers ?? []).map(({ health }) => health),
+    );
 
     if (user) {
       const supabase = await createClient();
       await supabase?.from("search_history").insert({
         user_id: user.id,
-        query,
-        expanded_terms: [...query.roles, ...query.keywords],
-        provider_count: result.providers.length,
+        query: baseQuery,
+        expanded_terms: [...new Set([...baseQuery.roles, ...baseQuery.keywords, ...(plan?.roles ?? []), ...(plan?.keywords ?? [])])],
+        provider_count: mergedHealth.length,
         result_count: jobs.length,
         duration_ms: Date.now() - startedAt,
       });
     }
 
-    const disclosureBase = result.providers.some((provider) => provider.providerId === "mock")
-      ? "Development fixtures — not live listings."
-      : result.totalMatches > jobs.length
-        ? `${result.totalMatches} unique live listings matched across ${result.providers.length} source pipelines. Showing ${jobs.length} after final ranking and strict filters.`
-        : `${jobs.length} unique live listing${jobs.length === 1 ? "" : "s"} matched across ${result.providers.length} source pipeline${result.providers.length === 1 ? "" : "s"}.`;
-    const disclosure = `${disclosureBase} · Engine ${SEARCH_ENGINE_VERSION}`;
+    const disclosure = `${jobs.length} unique live listings after strict filters. Normal search found ${normalJobs.length}; LLM search found ${llmJobs.length}; ${overlap} appeared in both. · Engine ${SEARCH_ENGINE_VERSION}`;
 
     return NextResponse.json({
       jobs,
-      providers: result.providers.map(({ health }) => health),
-      partial: result.partial,
-      interpretedQuery: query,
+      providers: mergedHealth,
+      partial: normalResult.partial || Boolean(llmResult?.partial),
+      interpretedQuery: baseQuery,
+      llmQuery,
+      llmPlan: plan,
       warnings,
       disclosure,
       totalMatches: jobs.length,
       sourceBreakdown: finalBreakdown,
+      searchModes: {
+        normal: { count: normalJobs.length, sourceBreakdown: normalBreakdown },
+        llm: { count: llmJobs.length, sourceBreakdown: llmBreakdown, available: Boolean(plan && llmResult) },
+        overlap,
+        combined: jobs.length,
+      },
+      scoring: {
+        formula: "55% deterministic CV fit + 25% LLM semantic fit + 10% freshness + 10% source confidence when both CV and LLM assessment are available",
+      },
       engineVersion: SEARCH_ENGINE_VERSION,
     }, { headers: privateHeaders });
   } catch (error) {

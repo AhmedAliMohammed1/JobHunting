@@ -5,6 +5,8 @@ import { mergeAuthoritativeProfile, parseCandidateText, type CandidateProfileExt
 import { createClient } from "@/src/lib/database/supabase/server";
 import { idSchema } from "@/src/lib/validation/product";
 
+export const maxDuration = 140;
+
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
 const manualFieldMap: Record<string, keyof CandidateProfileExtraction> = {
@@ -64,7 +66,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   if (documentError) return NextResponse.json({ error: "Could not load the parsed CV." }, { status: 500, headers: privateHeaders });
   if (!document) return NextResponse.json({ error: "CV document not found." }, { status: 404, headers: privateHeaders });
-  if (document.parse_status !== "COMPLETE" || typeof document.extracted_text !== "string" || document.extracted_text.trim().length < 40) {
+  if (typeof document.extracted_text !== "string" || document.extracted_text.trim().length < 40) {
     return NextResponse.json({ error: "Extract the CV text successfully before building the AI profile." }, { status: 409, headers: privateHeaders });
   }
 
@@ -131,7 +133,10 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     return NextResponse.json({ profile: saved }, { headers: privateHeaders });
   } catch (error) {
     const message = safeMessage(error);
-    await supabase.from("cv_documents").update({ parse_status: "FAILED", parse_error: `AI profile extraction failed: ${message}` }).eq("id", document.id).eq("user_id", user.id);
+    await supabase.from("cv_documents").update({
+      parse_status: "COMPLETE",
+      parse_error: `AI profile extraction failed: ${message}`,
+    }).eq("id", document.id).eq("user_id", user.id);
     return NextResponse.json({ error: `AI profile extraction failed: ${message}` }, { status: 502, headers: privateHeaders });
   }
 }

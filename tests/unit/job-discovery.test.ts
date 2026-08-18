@@ -27,7 +27,7 @@ describe("public job discovery", () => {
     expect(isLikelyJobUrl("https://example.com/careers")).toBe(false);
   });
 
-  it("normalizes a publicly indexed LinkedIn job and preserves the original URL", async () => {
+  it("normalizes a publicly indexed LinkedIn job and keeps a canonical exact job URL", async () => {
     const linkedInUrl = "https://www.linkedin.com/jobs/view/4455296976/?trackingId=abc";
     const fake: SearchDiscoveryProvider = {
       id: "fake",
@@ -44,7 +44,7 @@ describe("public job discovery", () => {
     const provider = createDiscoveryJobProvider(fake);
     const jobs = await provider.search(query({ providers: ["linkedin"] }));
     expect(jobs).toHaveLength(1);
-    expect(jobs[0]).toMatchObject({ provider: "linkedin", sourceType: "search-discovery", company: "Bosch", title: "Machine Learning Engineer", employmentType: "Full-time", workplaceType: "hybrid", sourceUrl: linkedInUrl });
+    expect(jobs[0]).toMatchObject({ provider: "linkedin", sourceType: "search-discovery", company: "Bosch", title: "Machine Learning Engineer", employmentType: "Full-time", workplaceType: "hybrid", sourceUrl: "https://www.linkedin.com/jobs/view/4455296976" });
   });
 
   it("keeps successful discovery groups when another group fails", async () => {

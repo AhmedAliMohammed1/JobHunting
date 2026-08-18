@@ -68,6 +68,57 @@ function unique(values: string[], limit: number): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].slice(0, limit);
 }
 
+function stringArray(value: unknown, limit: number, maxLength: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return unique(value.filter((item): item is string => typeof item === "string").map((item) => item.slice(0, maxLength)), limit);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+}
+
+function boundedScore(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizePlan(raw: unknown, baseQuery: JobSearchQuery, userRequest: string): LLMSearchPlan {
+  const value = asRecord(raw);
+  const roles = stringArray(value.roles, 16, 100);
+  const fallbackRoles = unique(baseQuery.roles.length ? baseQuery.roles : [userRequest], 16);
+  return planSchema.parse({
+    intentSummary: typeof value.intentSummary === "string" ? value.intentSummary.slice(0, 800) : userRequest.slice(0, 800),
+    roles: roles.length ? roles : fallbackRoles,
+    keywords: stringArray(value.keywords, 20, 100),
+    searchAngles: stringArray(value.searchAngles, 8, 180),
+  });
+}
+
+function normalizeAssessments(raw: unknown, allowedIds: Set<string>): LLMJobAssessment[] {
+  const root = asRecord(raw);
+  if (!Array.isArray(root.assessments)) return [];
+  const normalized: LLMJobAssessment[] = [];
+  for (const entry of root.assessments.slice(0, 24)) {
+    const value = asRecord(entry);
+    if (typeof value.id !== "string" || !allowedIds.has(value.id)) continue;
+    const relevanceScore = boundedScore(value.relevanceScore);
+    const cvFitScore = boundedScore(value.cvFitScore);
+    const confidence = boundedScore(value.confidence);
+    if (relevanceScore === undefined || cvFitScore === undefined || confidence === undefined) continue;
+    const parsed = assessmentSchema.shape.assessments.element.safeParse({
+      id: value.id,
+      relevanceScore,
+      cvFitScore,
+      confidence,
+      reasons: stringArray(value.reasons, 3, 220),
+      matchedConcepts: stringArray(value.matchedConcepts, 8, 100),
+      concerns: stringArray(value.concerns, 4, 180),
+    });
+    if (parsed.success) normalized.push(parsed.data);
+  }
+  return normalized;
+}
+
 function profileContext(profile?: CandidateProfile): string {
   if (!profile) return "No candidate profile is available. Optimize for the user's explicit search request only.";
   const skills = unique([
@@ -121,7 +172,7 @@ Candidate context:
 ${profileContext(profile)}`;
 
   const raw = await provider.generateStructured<unknown>(prompt, planJsonSchema, "llm_job_search_plan");
-  return planSchema.parse(raw);
+  return normalizePlan(raw, baseQuery, userRequest);
 }
 
 const LLM_DISCOVERY_SOURCES = [
@@ -189,9 +240,9 @@ Retrieved candidates:
 ${JSON.stringify(candidates)}`;
 
   const raw = await provider.generateStructured<unknown>(prompt, assessmentJsonSchema, "llm_job_assessment");
-  const parsed = assessmentSchema.parse(raw);
   const allowed = new Set(candidates.map((candidate) => candidate.id));
-  return new Map(parsed.assessments.filter((item) => allowed.has(item.id)).map((item) => [item.id, item]));
+  const assessments = normalizeAssessments(raw, allowed);
+  return new Map(assessments.map((item) => [item.id, item]));
 }
 
 function freshnessScore(postedAt?: string): number {

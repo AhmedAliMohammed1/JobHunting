@@ -158,8 +158,8 @@ export async function searchJobs(query: JobSearchQuery): Promise<AggregatedSearc
     requestedLimit: query.limit,
     totalMatches: ranked.length,
     returned: jobs.length,
-    sourceBreakdown,
-    providerRows: Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length])),
+    sourceBreakdown: JSON.stringify(sourceBreakdown),
+    providerRows: JSON.stringify(Object.fromEntries(filteredResults.map((result) => [result.providerId, result.jobs.length]))),
   });
 
   return {

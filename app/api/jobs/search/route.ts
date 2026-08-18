@@ -117,7 +117,7 @@ function rankWithProfile(profile: CandidateProfile | undefined, jobs: Array<Norm
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const limit = rateLimit(`job-search:${forwarded ?? "anonymous"}`, 12, 60_000);
-  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly.", engineVersion: SEARCH_ENGINE_VERSION }, { status: 429, headers: privateHeaders });
+  if (!limit.allowed) return NextResponse.json({ error: "Too many searches. Try again shortly." }, { status: 429, headers: privateHeaders });
 
   try {
     const startedAt = Date.now();
@@ -212,7 +212,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const disclosure = `${jobs.length} unique live listings after strict filters. Normal search found ${normalJobs.length}; LLM search found ${llmJobs.length}; ${overlap} appeared in both. · Engine ${SEARCH_ENGINE_VERSION}`;
+    const isMock = normalResult.providers.some((result) => result.providerId === "mock");
+    const disclosure = isMock
+      ? `Development fixtures — not live listings. Normal search found ${normalJobs.length}; LLM search found ${llmJobs.length}. · Engine ${SEARCH_ENGINE_VERSION}`
+      : `${jobs.length} unique live listings after strict filters. Normal search found ${normalJobs.length}; LLM search found ${llmJobs.length}; ${overlap} appeared in both. · Engine ${SEARCH_ENGINE_VERSION}`;
 
     return NextResponse.json({
       jobs,
@@ -239,7 +242,6 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json({
       error: error instanceof ZodError ? "Check the search query and filters." : "Search could not be completed.",
-      engineVersion: SEARCH_ENGINE_VERSION,
     }, { status: 400, headers: privateHeaders });
   }
 }

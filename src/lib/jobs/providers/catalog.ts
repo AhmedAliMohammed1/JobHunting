@@ -5,16 +5,28 @@ import { parseCareerSources } from "./career-sources";
 export function jobProviderCatalog(env: ServerEnv): JobProviderCatalogEntry[] {
   const adzunaReady = Boolean(env.ADZUNA_APP_ID && env.ADZUNA_APP_KEY);
   const joobleReady = Boolean(env.JOOBLE_API_KEY);
-  const discoveryReady = Boolean(env.TAVILY_API_KEY);
+  const tavilyReady = Boolean(env.TAVILY_API_KEY);
+  const braveReady = Boolean(env.BRAVE_SEARCH_API_KEY);
+  const discoveryReady = tavilyReady || braveReady;
   const configuredAts = new Set<string>(parseCareerSources(env.JOB_CAREER_SOURCES_JSON).map((source) => source.provider === "successfactors" ? "sap-successfactors" : source.provider));
+
+  const discoveryDetail = tavilyReady && braveReady
+    ? "Tavily discovery enabled with Brave Search as an independent fallback for publicly indexed job pages."
+    : tavilyReady
+      ? "Tavily public-job discovery enabled. Add Brave Search for independent fallback coverage."
+      : braveReady
+        ? "Brave Search public-job discovery enabled."
+        : "Public-job discovery is available when an optional search provider is configured.";
+
+  const discoverySetup = discoveryReady ? undefined : "Optional: add TAVILY_API_KEY and/or BRAVE_SEARCH_API_KEY in Vercel.";
 
   const discoveryEntry = (id: string, name: string, coverage: JobProviderCatalogEntry["coverage"] = "global"): JobProviderCatalogEntry => ({
     id,
     name,
     availability: discoveryReady ? "discovery" : "optional",
     coverage,
-    detail: discoveryReady ? "Search discovery enabled for publicly indexed job pages." : "Public-job discovery is available when the optional search provider is configured.",
-    setup: discoveryReady ? undefined : "Optional: add TAVILY_API_KEY in Vercel.",
+    detail: discoveryDetail,
+    setup: discoverySetup,
   });
 
   const atsEntry = (id: string, name: string, directRegistrySupported = true): JobProviderCatalogEntry => {
@@ -30,11 +42,11 @@ export function jobProviderCatalog(env: ServerEnv): JobProviderCatalogEntry[] {
         : discoveryReady
           ? directRegistrySupported
             ? "ATS public-job discovery enabled; configured employer boards can also be queried directly."
-            : "Publicly indexed employer postings are discovered through the configured search provider."
+            : "Publicly indexed employer postings are discovered through the configured search provider chain."
           : directRegistrySupported
-            ? "Employer boards are optional; public ATS discovery becomes available with the search provider."
+            ? "Employer boards are optional; public ATS discovery becomes available with a search provider."
             : "This ATS requires public search discovery because tenant-specific endpoints are not treated as a global API.",
-      setup: available ? undefined : directRegistrySupported ? "Optional: add TAVILY_API_KEY or configure JOB_CAREER_SOURCES_JSON." : "Optional: add TAVILY_API_KEY in Vercel.",
+      setup: available ? undefined : directRegistrySupported ? "Optional: add TAVILY_API_KEY, BRAVE_SEARCH_API_KEY, or configure JOB_CAREER_SOURCES_JSON." : "Optional: add TAVILY_API_KEY and/or BRAVE_SEARCH_API_KEY in Vercel.",
     };
   };
 

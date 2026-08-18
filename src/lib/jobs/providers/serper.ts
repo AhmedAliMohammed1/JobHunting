@@ -58,7 +58,8 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
 
       const body: Record<string, unknown> = {
         q: withSiteOperators(query, options.includeDomains),
-        num: Math.min(20, Math.max(1, options.maxResults ?? 10)),
+        // Serper rejects num values above 10 for this endpoint/account tier.
+        num: Math.min(10, Math.max(1, options.maxResults ?? 10)),
         hl: languageForQuery(query),
       };
       const country = countryForQuery(query);
@@ -84,9 +85,6 @@ export function createSerperSearchProvider(apiKey: string, cacheTtlSeconds = 600
         title: result.title,
         url: result.link,
         content: [result.snippet ?? "", result.date ?? ""].filter(Boolean).join(" "),
-        // Google organic position is a rank, not a Tavily-style semantic relevance score.
-        // Do not convert it to 1 / position because the downstream relevance threshold
-        // would incorrectly discard valid job-detail pages appearing below position four.
         publishedDate: result.date ?? undefined,
       }));
       cache.set(key, { expiresAt: Date.now() + cacheTtlSeconds * 1_000, value });
